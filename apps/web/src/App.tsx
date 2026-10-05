@@ -1,19 +1,23 @@
-import { ReactFlowProvider } from "@xyflow/react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, type CSSProperties } from "react";
 import { PlaybackBar } from "./debugger/PlaybackBar";
 import { Timeline } from "./debugger/Timeline";
 import { Transcript } from "./debugger/TranscriptPanel";
-import { WorkflowEditor } from "./graph/WorkflowEditor";
+import { GraphOverlay } from "./hud/GraphOverlay";
+import { OfficePanel } from "./hud/OfficePanel";
+import { Panel } from "./hud/Panel";
+import { HUD, worldInsets } from "./hud/panels";
+import { ShortcutHelp } from "./hud/ShortcutHelp";
+import { TopBar } from "./hud/TopBar";
+import { useShortcuts } from "./hud/useShortcuts";
 import { Inspector } from "./inspector/Inspector";
-import { Sidebar } from "./Sidebar";
 import { replay } from "./state/replayStore";
 import { useRunStore } from "./state/runStore";
 import { useUiStore } from "./state/uiStore";
 import { useWorkflowStore } from "./state/workflowStore";
-import { buildLayout } from "./world/layout";
+import { buildLayout, type WorldLayout } from "./world/layout";
 import { WorldView } from "./world/WorldView";
 
-/** Advances visualization time once per frame, whichever view is on screen. */
+/** Advances visualization time once per frame. */
 function useReplayClock(): void {
   useEffect(() => {
     let frame = 0;
@@ -29,12 +33,18 @@ function useReplayClock(): void {
   }, []);
 }
 
+/**
+ * The shell: the pixel world fills the screen and everything else floats over it as
+ * collapsible panels. Build mode edits the workflow; run and replay only read events.
+ */
 export function App() {
-  const { workflow, dirty, error: workflowError, init, save } = useWorkflowStore();
-  const { run, mode, error: runError, start, close, refresh } = useRunStore();
-  const { view, setView } = useUiStore();
+  const { workflow, error: workflowError, init } = useWorkflowStore();
+  const { run, mode, error: runError, refresh } = useRunStore();
+  const panels = useUiStore((state) => state.panels);
+  const help = useUiStore((state) => state.help);
 
   useReplayClock();
+  useShortcuts();
 
   useEffect(() => {
     void init();
@@ -44,77 +54,63 @@ export function App() {
     void refresh(workflow.id);
   }, [workflow.id, refresh]);
 
-  // With no run on screen the world previews the workflow being edited.
+  // With no run on screen the world previews the workflow being built. Keyed on the
+  // layout's content, so typing a prompt does not rebuild a scene that has not changed.
+  const previewKey = useMemo(() => JSON.stringify(buildLayout(workflow)), [workflow]);
   useEffect(() => {
-    if (mode === "idle") replay.load([], buildLayout(workflow));
-  }, [mode, workflow]);
+    if (mode === "build") replay.load([], JSON.parse(previewKey) as WorldLayout);
+  }, [mode, previewKey]);
 
-  // Names shown in the transcript and inspector come from the run when there is one.
+  // Names shown in the log and the inspector come from the run when there is one.
   const shown = run?.workflow ?? workflow;
   const names = useMemo(() => Object.fromEntries(shown.agents.map((agent) => [agent.id, agent.name])), [shown]);
 
-  const onRun = async () => {
-    try {
-      const saved = dirty || !workflow.id ? await save() : workflow;
-      setView("world");
-      await start(saved, saved.input);
-    } catch {
-      // the stores already surface the error
-    }
-  };
+  const insets = useMemo(() => worldInsets(panels), [panels.office, panels.inspector]);
+  const geometry = {
+    "--hud-gap": `${HUD.gap}px`,
+    "--office-w": `${HUD.officeWidth}px`,
+    "--inspector-w": `${HUD.inspectorWidth}px`,
+    "--inset-left": `${insets.left}px`,
+    "--inset-right": `${insets.right}px`,
+  } as CSSProperties;
 
   const error = workflowError ?? runError;
 
   return (
     <div className="app">
-      <header className="topbar">
-        <h1>Pixel Agents</h1>
-        <div className="segmented">
-          <button className={view === "graph" ? "active" : ""} onClick={() => setView("graph")}>
-            GRAPH
-          </button>
-          <button className={view === "world" ? "active" : ""} onClick={() => setView("world")}>
-            WORLD
-          </button>
-        </div>
-        <span className="spacer" />
-        {run && (
-          <span className="muted">
-            {run.id} · {run.status}
-            <button title="Close this run and go back to the workflow preview" onClick={close}>
-              ✕
-            </button>
-          </span>
-        )}
-        <button className="primary run" disabled={mode === "live"} onClick={() => void onRun()}>
-          ▶ RUN
-        </button>
-      </header>
-
+      <TopBar />
       {error && <div className="error-banner">{error}</div>}
 
-      <Sidebar />
+      <main className="stage" style={geometry}>
+        <WorldView insets={insets} />
+        {panels.graph && <GraphOverlay workflow={shown} editable={mode === "build"} resetKey={run?.id ?? workflow.id} />}
 
-      <main className="main-view">
-        {view === "graph" ? (
-          <ReactFlowProvider>
-            <WorkflowEditor />
-          </ReactFlowProvider>
-        ) : (
-          <WorldView />
-        )}
+        <div className="hud-column left">
+          <Panel id="office" title="Office" hotkey="O" className="office-panel">
+            <OfficePanel />
+          </Panel>
+          {run && (
+            <Panel id="log" title="Log" hotkey="L" className="log-panel">
+              <Transcript names={names} />
+            </Panel>
+          )}
+        </div>
+        <div className="hud-column right">
+          <Panel id="inspector" title="Inspector" hotkey="I" className="inspector-panel">
+            <Inspector names={names} />
+          </Panel>
+        </div>
+
+        {help && <ShortcutHelp />}
       </main>
 
-      <aside className="inspector-panel">
-        <Inspector names={names} />
-      </aside>
-
-      <footer className="bottom">
+      <footer className="dock">
+        {panels.timeline && (
+          <div className="timeline-drawer">
+            <Timeline />
+          </div>
+        )}
         <PlaybackBar />
-        <div className="bottom-split">
-          <Timeline />
-          <Transcript names={names} />
-        </div>
       </footer>
     </div>
   );

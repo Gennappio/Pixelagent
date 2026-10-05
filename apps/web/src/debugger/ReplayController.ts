@@ -6,6 +6,13 @@ import { initialWorldState, type WorldState } from "../world/worldState";
 
 export const SPEEDS = [0.25, 0.5, 1, 2, 4] as const;
 
+/** The next slower (-1) or faster (+1) replay speed, staying within the supported ones. */
+export function adjacentSpeed(speed: number, direction: -1 | 1): number {
+  const index = SPEEDS.findIndex((candidate) => candidate >= speed);
+  const from = index < 0 ? SPEEDS.length - 1 : index;
+  return SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, from + direction))];
+}
+
 export interface ReplaySnapshot {
   /** Number of events visualized so far, counting the one currently animating. */
   position: number;

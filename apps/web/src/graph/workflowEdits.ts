@@ -133,6 +133,9 @@ export function toggleAgentTool(workflow: Workflow, agentId: string, tool: strin
   const wired = workflow.edges.filter((edge) => edge.source === agentNode.id && isToolNode(edge.target));
 
   if (wired.length === 0) {
+    // A station placed in the office but used by nobody yet is the one to wire up.
+    const spare = workflow.nodes.find((node) => isToolNode(node.id) && !workflow.edges.some((edge) => edge.target === node.id));
+    if (spare) return connect(workflow, agentNode.id, spare.id);
     const offset = workflow.edges.filter((edge) => edge.source === agentNode.id).length * 70;
     const added = addToolNode(workflow, tool, { x: agentNode.position.x + 280, y: agentNode.position.y + 10 + offset });
     return connect(added.workflow, agentNode.id, added.node.id);

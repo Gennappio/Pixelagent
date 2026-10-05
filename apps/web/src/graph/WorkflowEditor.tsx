@@ -2,6 +2,7 @@ import {
   applyEdgeChanges,
   applyNodeChanges,
   Background,
+  BackgroundVariant,
   Controls,
   ReactFlow,
   type Connection,
@@ -73,8 +74,14 @@ function useActivity(): Activity {
   };
 }
 
-export function WorkflowEditor() {
-  const workflow = useWorkflowStore((state) => state.workflow);
+interface Props {
+  /** The workflow being built, or the snapshot a run executed. */
+  workflow: Workflow;
+  /** False while a run is on screen: the graph is then a view of what ran. */
+  editable: boolean;
+}
+
+export function WorkflowEditor({ workflow, editable }: Props) {
   const edit = useWorkflowStore((state) => state.edit);
   const selection = useUiStore((state) => state.selection);
   const select = useUiStore((state) => state.select);
@@ -95,6 +102,7 @@ export function WorkflowEditor() {
   const onNodesChange = useCallback(
     (changes: NodeChange<FlowNode>[]) => {
       setNodes((current) => applyNodeChanges(changes, current));
+      if (!editable) return;
       for (const change of changes) {
         if (change.type === "position" && change.position && change.dragging === false) {
           const { id, position } = change;
@@ -107,16 +115,16 @@ export function WorkflowEditor() {
         select(null);
       }
     },
-    [edit, select],
+    [edit, select, editable],
   );
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
       setEdges((current) => applyEdgeChanges(changes, current));
       const removed = changes.flatMap((change) => (change.type === "remove" ? [change.id] : []));
-      if (removed.length > 0) edit((current) => removeEdges(current, removed));
+      if (editable && removed.length > 0) edit((current) => removeEdges(current, removed));
     },
-    [edit],
+    [edit, editable],
   );
 
   const isValidConnection = useCallback(
@@ -136,8 +144,13 @@ export function WorkflowEditor() {
       nodeTypes={nodeTypes}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
-      onConnect={(connection) => edit((current) => connect(current, connection.source, connection.target))}
+      onConnect={(connection) => editable && edit((current) => connect(current, connection.source, connection.target))}
       isValidConnection={isValidConnection}
+      nodesDraggable={editable}
+      nodesConnectable={editable}
+      edgesFocusable={editable}
+      // Read-only, arrow keys belong to the replay controls, not to nudging nodes.
+      disableKeyboardA11y={!editable}
       onNodeClick={(_, node) => {
         if (node.type === "agent") select({ kind: "agent", agentId: node.data.agent.id });
         else if (node.type === "tool") select({ kind: "tool", tool: node.data.tool });
@@ -146,11 +159,11 @@ export function WorkflowEditor() {
       colorMode="dark"
       fitView
       fitViewOptions={{ maxZoom: 1, padding: 0.2 }}
-      deleteKeyCode={["Backspace", "Delete"]}
+      deleteKeyCode={editable ? ["Backspace", "Delete"] : null}
       proOptions={{ hideAttribution: true }}
     >
-      <Background gap={24} />
-      <Controls showInteractive={false} />
+      <Background gap={24} variant={BackgroundVariant.Lines} color="rgba(127, 178, 255, 0.09)" />
+      <Controls showInteractive={false} position="bottom-right" />
     </ReactFlow>
   );
 }

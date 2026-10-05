@@ -1,6 +1,6 @@
 import { Application, Container, Graphics } from "pixi.js";
 import { AgentSprite } from "./AgentSprite";
-import { WorldCamera } from "./Camera";
+import { NO_INSETS, WorldCamera, type Insets } from "./Camera";
 import { ROOM, type WorldLayout } from "./layout";
 import { SpeechBubble } from "./SpeechBubble";
 import { ToolStation } from "./ToolStation";
@@ -17,6 +17,14 @@ export interface WorldCallbacks {
   onAgentClick: (agentId: string) => void;
   onBubbleClick: (eventId: string) => void;
   onStationClick: (tool: string) => void;
+  /** A click on empty floor. */
+  onFloorClick: () => void;
+}
+
+/** What the user has picked. Interface state: it never comes from, or reaches, the event log. */
+export interface WorldSelection {
+  agentId?: string;
+  tool?: string;
 }
 
 function drawRoom(): Graphics {
@@ -52,6 +60,10 @@ export class PixelWorld {
   private bubbles = new Map<string, SpeechBubble>();
   private stations = new Map<string, ToolStation>();
 
+  private insets: Insets = NO_INSETS;
+  private selection: WorldSelection = {};
+  private resizeObserver: ResizeObserver | null = null;
+
   private ready = false;
   private destroyed = false;
 
@@ -79,14 +91,30 @@ export class PixelWorld {
     this.host.appendChild(this.app.canvas);
     this.scene.addChild(drawRoom(), this.stationLayer, this.agentLayer, this.bubbleLayer);
     this.app.stage.addChild(this.scene);
-    this.camera = new WorldCamera(this.app, this.scene, ROOM);
+    this.camera = new WorldCamera(this.app, this.scene, ROOM, this.callbacks.onFloorClick);
+    this.camera.setInsets(this.insets);
+    // The renderer only follows window resizes by itself; the host also changes size
+    // when the timeline drawer or the playback bar opens and closes.
+    this.resizeObserver = new ResizeObserver(() => this.app.queueResize());
+    this.resizeObserver.observe(this.host);
     this.app.ticker.add(this.frame);
     this.ready = true;
+  }
+
+  /** The viewport edges covered by HUD panels: the room is framed in what is left. */
+  setInsets(insets: Insets): void {
+    this.insets = insets;
+    this.camera?.setInsets(insets);
+  }
+
+  setSelection(selection: WorldSelection): void {
+    this.selection = selection;
   }
 
   destroy(): void {
     this.destroyed = true;
     if (!this.ready) return;
+    this.resizeObserver?.disconnect();
     this.camera?.destroy();
     this.app.destroy(true, { children: true });
   }
@@ -94,15 +122,17 @@ export class PixelWorld {
   private frame = (): void => {
     const layout = this.source.worldLayout;
     if (layout !== this.layout) this.rebuild(layout);
-    this.camera?.update();
+    this.camera?.update(this.app.ticker.deltaMS);
 
     const state = this.source.worldState;
     const clock = this.source.clock;
-    for (const [tool, station] of this.stations) station.update(state.stations[tool], clock);
+    for (const [tool, station] of this.stations) {
+      station.update(state.stations[tool], clock, this.selection.tool === tool);
+    }
     for (const [agentId, sprite] of this.agents) {
       const agent = state.agents[agentId];
       if (!agent) continue;
-      sprite.update(agent, clock);
+      sprite.update(agent, clock, this.selection.agentId === agentId);
       this.bubbles.get(agentId)?.update(agent.speechBubble, agent.position.x, agent.position.y);
     }
   };

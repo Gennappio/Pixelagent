@@ -47,11 +47,11 @@ export function Inspector({ names }: { names: Record<string, string> }) {
   useReplay(); // the log may have grown since the selection was made
 
   if (selection?.kind === "agent") {
-    const editable = workflow.agents.find((agent) => agent.id === selection.agentId);
-    const executed = run?.workflow.agents.find((agent) => agent.id === selection.agentId);
-    if (editable || executed) {
+    // With a run on screen the inspector describes the agent that ran, not the one being edited.
+    const agent = (run?.workflow ?? workflow).agents.find((candidate) => candidate.id === selection.agentId);
+    if (agent) {
       // Keyed so switching agents (or loading a run) resets the open tab.
-      return <AgentInspector key={`${selection.agentId}:${run?.id}`} editable={editable} executed={executed} names={names} />;
+      return <AgentInspector key={`${agent.id}:${run?.id ?? "build"}`} agent={agent} editable={!run} names={names} />;
     }
   }
   if (selection?.kind === "event") {
@@ -62,7 +62,7 @@ export function Inspector({ names }: { names: Record<string, string> }) {
 
   return (
     <div className="inspector empty">
-      <p>Select an agent, a tool, a speech bubble or a timeline event to inspect it.</p>
+      <p>Click a character, a tool, a speech bubble or a timeline event to inspect it.</p>
     </div>
   );
 }

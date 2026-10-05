@@ -125,7 +125,7 @@ with the workflow and never read by the runtime.
 
 # 4. Status
 
-Done in revision 1 (commit 99038b2 and the uncommitted move of workflows to
+Done in revision 1 (commit 99038b2 and the move of workflows to
 `workflows/*.json`):
 
 ```text
@@ -134,12 +134,23 @@ SimpleRuntime: linear Start → agent → … → End, deterministic FakeModel
 mock tools: web_search, send_email, calculator
 pixel world (PixiJS), VisualEventMapper, one animation at a time
 ReplayController: play, pause, next, previous, seek, speed
-XYFlow graph editor (currently the only editor)
+XYFlow graph editor
 timeline, transcript, agent / event / tool inspectors
 workflow files, run export with per-agent context snapshots
 ```
 
-Not done: everything in §38 from Phase 7 on.
+Done in revision 2:
+
+```text
+Phase 7   world-first shell: the world fills the screen, floating collapsible
+          panels remembered across reloads, keyboard shortcuts, BUILD | RUN | REPLAY,
+          graph as an overlay (editable in BUILD, read-only for a run),
+          selection markers in the world, camera framing beside the open panels
+```
+
+Not done: everything in §38 from Phase 8 on. Until Phase 10 the workflow is
+still the revision 1 node graph and the graph overlay is still where agents
+are connected.
 
 The deterministic demo in §34 passes and must keep passing after every phase.
 
@@ -668,36 +679,60 @@ change to the log.
 
 # 23. UI Layout
 
-The world fills the screen. Everything else is a collapsible overlay with a
-keyboard shortcut; panel state is remembered per browser.
+The world fills the screen. Everything else is a collapsible panel with a
+keyboard shortcut; panel state is remembered per browser (`localStorage`).
 
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │ [BUILD | RUN | REPLAY]              ▶ RUN   [G] graph   │
 │                                                         │
-│ palette ▸         WORLD, FULL SCREEN         ◂ inspector│
-│  agents                                                 │
-│  tools             ┌────────┐  ┌────────┐               │
-│  tables            │ room A │☎ │ room B │               │
-│  rooms             └────────┘  └────────┘               │
+│ office ▸          WORLD, FULL SCREEN         ◂ inspector│
+│  workflow                                               │
+│  agents            ┌────────┐  ┌────────┐               │
+│  tools             │ room A │☎ │ room B │               │
+│  runs              └────────┘  └────────┘               │
 │                                                         │
-│ log ▸  (transcript as a game event log)                 │
+│ log ▸  (transcript as a game message feed)              │
 ├─────────────────────────────────────────────────────────┤
 │ ◀ ▶ 1x ━━━━━●━━━━━━━━━━━━ 12/38           [▾ timeline]  │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ```text
-palette      BUILD only. Add agent, table, room; tool stations from GET /tools.
-inspector    opens on selection; tabs in §26
-log          the transcript, bottom-left, like a game message log
-timeline     drawer above the playback bar
-playback bar always visible, collapsible to a thin strip
-graph        [G] toggles the derived graph as a blueprint overlay, read-only
+office   [O]  left. The workflow file, its agents and tools, the stored runs. Its
+              sections collapse one by one. The palette is the part of it that adds
+              things (agents, tool stations; later tables and rooms): BUILD only.
+inspector [I] right. Opens by itself when something is selected; tabs in §26.
+log      [L]  the transcript, bottom-left, like a game message feed. Only while a
+              run is on screen.
+timeline [T]  drawer above the playback bar
+playback [B]  always visible; collapses to a thin strip that still shows progress
+graph    [G]  the workflow as a blueprint laid over the world
+hide all [H]  collapses every panel, and brings back the same ones
 ```
 
-Modes: BUILD edits the workflow. RUN starts a live run and follows it.
-REPLAY loads a stored run. Switching mode never changes the workflow.
+Playback from the keyboard: Space play/pause, ← → step, Home / End, − / + speed.
+Ctrl+Enter runs, Ctrl+S saves, ? lists every shortcut. A plain key never fires
+while the user is typing in a field. Shortcuts are data (`hud/shortcuts.ts`): the
+help list is rendered from the table that implements them.
+
+The mode is not separate state: it is whether a run is on screen.
+
+```text
+BUILD    no run on screen. The world previews the workflow. The only mode that
+         edits it: palette, configuration form, graph editing.
+RUN      following a live run. Becomes REPLAY by itself when execution ends, even
+         if the visualization is still catching up.
+REPLAY   showing a stored run. Lists, inspector and graph describe what was
+         executed, read-only, with a way back to BUILD.
+```
+
+Switching mode never changes the workflow.
+
+The camera frames the room in the space the open side panels leave free, and
+re-frames when they open or close, unless the user has zoomed or panned.
+Selection (the ring under a character) is interface state: it is kept out of
+`WorldState`, which is derived from events only.
 
 ---
 
@@ -730,6 +765,10 @@ Derived from `relations` by a pure function (`deriveGraph.ts`), rendered with
 XYFlow, read-only. Nodes: agents, tools, tables, grouped by room. Edges:
 relations labelled by verb, dashed when optional. It is a blueprint for
 review and for people who think in boxes.
+
+Until Phase 10 the graph is still the stored model, and until Phase 11 it is
+where agents get connected: the overlay is editable in BUILD and read-only
+whenever a run is on screen.
 
 ---
 
@@ -812,10 +851,12 @@ pixel-agents/
                             Devices.ts, ToolStation.ts, SpeechBubble.ts, Camera.ts, layout.ts, worldState.ts
     build/                  BuildMode.tsx, ContextMenu.tsx, RelationEditor.tsx, Palette.tsx, dragRules.ts
     graph/                  GraphView.tsx (read-only), deriveGraph.ts
-    hud/                    Hud.tsx, Panel.tsx, shortcuts.ts
+    hud/                    panels.ts (state, persistence, insets), shortcuts.ts (the table),
+                            useShortcuts.ts, Panel.tsx, TopBar.tsx, OfficePanel.tsx,
+                            GraphOverlay.tsx, ShortcutHelp.tsx
     debugger/               ReplayController.ts, Timeline.tsx, PlaybackBar.tsx, TranscriptPanel.tsx, transcript.ts
     inspector/              AgentInspector.tsx, DocumentInspector.tsx, EventInspector.tsx, ...
-    state/                  workflowStore.ts, runStore.ts, replayStore.ts, uiStore.ts
+    state/                  workflowStore.ts, runStore.ts, replayStore.ts, uiStore.ts, actions.ts
 ```
 
 Create packages only for boundaries that are genuinely shared.
@@ -949,17 +990,18 @@ it, fork the run. Do not start it before replay and relations are stable.
 
 # 38. Development Order
 
-Phases 1–6 are done (§4). Each phase below ends with `npm test` green and
+Phases 1–7 are done (§4). Each phase below ends with `npm test` green and
 the demo of §34 passing. Do not start a phase before the previous one is
 merged.
 
-## Phase 7 — World-first shell
+## Phase 7 — World-first shell (done)
 
 ```text
 world is the default and main view; graph becomes an overlay toggled with G
-collapsible HUD panels: palette, inspector, log, timeline; state in localStorage
+collapsible HUD panels: office, inspector, log, timeline; state in localStorage
 keyboard shortcuts for panels and playback
 mode switch BUILD | RUN | REPLAY in the top bar (BUILD still uses the graph editor here)
+only BUILD edits the workflow; a run on screen is read-only everywhere
 ```
 
 ## Phase 8 — Documents

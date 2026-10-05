@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { demoWorkflow } from "../testing/demoRun";
-import { addAgent, canConnect, connect, emptyWorkflow, removeNodes, toggleAgentTool } from "./workflowEdits";
+import { addAgent, addToolNode, canConnect, connect, emptyWorkflow, removeNodes, toggleAgentTool } from "./workflowEdits";
 
 const toolsOf = (workflow: typeof demoWorkflow, agentId: string) =>
   workflow.agents.find((agent) => agent.id === agentId)!.tools.map((tool) => tool.name);
@@ -28,6 +28,21 @@ describe("workflow edits", () => {
     expect(toolsOf(off, "anna")).toEqual([]);
     expect(off.nodes).toHaveLength(demoWorkflow.nodes.length);
     expect(off.edges).toHaveLength(demoWorkflow.edges.length);
+  });
+
+  it("wires up a station already placed in the office instead of adding a second one", () => {
+    const placed = addToolNode(demoWorkflow, "calculator");
+    const given = toggleAgentTool(placed.workflow, "anna", "calculator");
+    expect(toolsOf(given, "anna")).toEqual(["calculator"]);
+    expect(given.nodes).toHaveLength(placed.workflow.nodes.length);
+    expect(given.edges.at(-1)).toMatchObject({ source: "node_anna", target: placed.node.id });
+  });
+
+  it("gives each agent its own station when the existing one is already in use", () => {
+    const shared = toggleAgentTool(demoWorkflow, "anna", "web_search");
+    expect(toolsOf(shared, "anna")).toEqual(["web_search"]);
+    expect(toolsOf(shared, "luca")).toEqual(["web_search"]);
+    expect(shared.nodes).toHaveLength(demoWorkflow.nodes.length + 1);
   });
 
   it("removing an agent node removes the agent and its edges, but never Start/End", () => {

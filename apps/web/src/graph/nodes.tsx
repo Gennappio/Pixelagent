@@ -11,46 +11,49 @@ export type FlowNode = AgentFlowNode | ToolFlowNode | TerminalFlowNode;
 /** Handle an agent's tool connections leave from; everything else uses the default handle. */
 export const TOOLS_HANDLE = "tools";
 
-export function AgentNode({ data, selected }: NodeProps<AgentFlowNode>) {
+// Each node forwards `isConnectable` to its handles: that is how React Flow turns off
+// connecting when the graph is read-only (a handle is connectable unless told otherwise).
+
+export function AgentNode({ data, selected, isConnectable }: NodeProps<AgentFlowNode>) {
   const { agent, active } = data;
   const palette = spriteFor(agent.appearance.sprite);
   return (
     <div className={`flow-node agent-node${selected ? " selected" : ""}${active ? " active" : ""}`}>
-      <Handle type="target" position={Position.Top} />
+      <Handle type="target" position={Position.Top} isConnectable={isConnectable} />
       <span className="avatar" style={{ background: cssColor(palette.shirt), borderColor: cssColor(palette.hair) }} />
       <div>
         <div className="node-title">{agent.name}</div>
         <div className="node-subtitle">{agent.role || "Agent"}</div>
       </div>
-      <Handle type="source" position={Position.Bottom} />
-      <Handle type="source" position={Position.Right} id={TOOLS_HANDLE} className="tools-handle" />
+      <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} />
+      <Handle type="source" position={Position.Right} id={TOOLS_HANDLE} className="tools-handle" isConnectable={isConnectable} />
     </div>
   );
 }
 
-export function ToolNode({ data, selected }: NodeProps<ToolFlowNode>) {
+export function ToolNode({ data, selected, isConnectable }: NodeProps<ToolFlowNode>) {
   return (
     <div className={`flow-node tool-node${selected ? " selected" : ""}${data.active ? " active" : ""}`}>
-      <Handle type="target" position={Position.Left} />
+      <Handle type="target" position={Position.Left} isConnectable={isConnectable} />
       <div className="node-title">{toolLabel(data.tool)}</div>
       <div className="node-subtitle">tool</div>
     </div>
   );
 }
 
-export function StartNode() {
+export function StartNode({ isConnectable }: NodeProps<TerminalFlowNode>) {
   return (
     <div className="flow-node terminal-node">
       START
-      <Handle type="source" position={Position.Bottom} />
+      <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} />
     </div>
   );
 }
 
-export function EndNode() {
+export function EndNode({ isConnectable }: NodeProps<TerminalFlowNode>) {
   return (
     <div className="flow-node terminal-node">
-      <Handle type="target" position={Position.Top} />
+      <Handle type="target" position={Position.Top} isConnectable={isConnectable} />
       END
     </div>
   );

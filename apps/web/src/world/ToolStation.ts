@@ -49,6 +49,8 @@ const fallbackDevice: Draw = (g, active) => {
 export class ToolStation extends Container {
   private device = new Graphics();
   private glow = new Graphics();
+  /** Marks the station the user has picked. */
+  private outline = new Graphics().rect(-38, -54, 76, 90).stroke({ color: 0xffd166, width: 2 });
   private draw: Draw;
   private drawnKey = "";
 
@@ -59,20 +61,22 @@ export class ToolStation extends Container {
 
     const label = new Text({
       text: toolLabel(tool),
-      style: { fontFamily: "monospace", fontSize: 10, fill: 0xdfe6f5, stroke: { color: INK, width: 3 } },
+      style: { fontFamily: "monospace", fontSize: 10, fill: 0xdfe6f5, stroke: { color: INK, width: 3, join: "round" } },
       resolution: 3,
     });
     label.anchor.set(0.5, 1);
     label.y = -40;
 
-    this.addChild(this.glow, this.device, label);
+    this.outline.visible = false;
+    this.addChild(this.outline, this.glow, this.device, label);
     this.eventMode = "static";
     this.cursor = "pointer";
     this.hitArea = new Rectangle(-36, -52, 72, 86);
     this.on("pointertap", () => onClick(tool));
   }
 
-  update(state: StationVisualState | undefined, clock: number): void {
+  update(state: StationVisualState | undefined, clock: number, selected: boolean): void {
+    this.outline.visible = selected;
     const active = state?.active ?? false;
     const frame = active ? Math.floor(clock / 220) % 2 : 0;
     this.glow.visible = active;

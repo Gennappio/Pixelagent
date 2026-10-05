@@ -3,7 +3,7 @@ import { worldStateAt } from "../animation/AnimationController";
 import { demoEvents, demoWorkflow } from "../testing/demoRun";
 import { buildLayout } from "../world/layout";
 import { initialWorldState, STATION_DISTANCE } from "../world/worldState";
-import { ReplayController } from "./ReplayController";
+import { adjacentSpeed, ReplayController, SPEEDS } from "./ReplayController";
 
 const layout = buildLayout(demoWorkflow);
 const FRAME = 16;
@@ -17,6 +17,21 @@ function runToStop(controller: ReplayController, maxFrames = 100_000): number {
   }
   return frames;
 }
+
+describe("adjacentSpeed", () => {
+  it("steps through the supported speeds and stops at both ends", () => {
+    expect(adjacentSpeed(1, 1)).toBe(2);
+    expect(adjacentSpeed(1, -1)).toBe(0.5);
+    expect(adjacentSpeed(4, 1)).toBe(4);
+    expect(adjacentSpeed(0.25, -1)).toBe(0.25);
+    for (const speed of SPEEDS) expect(SPEEDS).toContain(adjacentSpeed(speed, 1));
+  });
+
+  it("recovers from a speed that is not in the list", () => {
+    expect(SPEEDS).toContain(adjacentSpeed(3, 1));
+    expect(SPEEDS).toContain(adjacentSpeed(100, -1));
+  });
+});
 
 describe("ReplayController", () => {
   let controller: ReplayController;

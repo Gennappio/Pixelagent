@@ -1,7 +1,8 @@
 # Pixel Agents
 
-Design, run, observe, debug and replay multi-agent workflows — as a graph, and as a
-small pixel-art office where every agent is a character.
+Design, run, observe, debug and replay multi-agent workflows in a small pixel-art
+office where every agent is a character. The office is the main screen; a node graph
+of the same workflow is one key away.
 
 The pixel world is **not** the orchestration engine. It is one of two views of the
 structured event log a run produces:
@@ -26,8 +27,32 @@ npm run dev:web      # terminal 2 — UI on http://localhost:5173
 Open http://localhost:5173 and press **▶ RUN**. The seeded *Sales report demo* needs no
 API keys: Anna briefs Luca, Luca walks to the computer and searches, hands the result
 to Gianni, Gianni sends the email. Afterwards, replay it: pause, step event by event,
-scrub, change speed, and click any character, speech bubble, timeline dot or transcript
-line to see the event behind it.
+scrub, change speed, and click any character, speech bubble, timeline dot or log line
+to see the event behind it.
+
+## The screen
+
+The world fills the window. Everything else floats over it and collapses, and the
+panels you leave open are remembered.
+
+| Key | Panel | | Key | Playback |
+|---|---|---|---|---|
+| `O` | Office: workflow, agents, tools, runs | | `Space` | Play or pause |
+| `I` | Inspector (opens when you click something) | | `←` `→` | Previous / next event |
+| `L` | Log of the run on screen | | `Home` `End` | Start / end |
+| `T` | Timeline | | `−` `+` | Slower / faster |
+| `B` | Playback bar | | `Ctrl Enter` | Run the workflow |
+| `G` | Graph of the workflow | | `Ctrl S` | Save the workflow |
+| `H` | Hide or bring back every panel | | `?` | All shortcuts |
+
+In the world: click to inspect, click the floor to deselect, wheel to zoom, drag the
+floor to pan, double-click to frame the room again.
+
+The switch in the top bar says what you are looking at. **BUILD**: no run on screen,
+the world previews the workflow, and this is the only mode that edits it. **RUN**: a
+live run. **REPLAY**: a stored run, shown as it was executed and read-only. Agents are
+still connected in the graph (`G`) for now; building inside the world comes with
+Phase 11.
 
 ```bash
 npm test             # server (pytest) + web (vitest)
@@ -51,11 +76,12 @@ apps/server/server/
 apps/web/src/
   protocol/    wire types (mirror of the server models)
   animation/   VisualEventMapper (event → visual actions), AnimationController
-  world/       PixiJS renderer, world state, layout, placeholder sprites
+  world/       PixiJS renderer, camera, world state, layout, placeholder sprites
+  hud/         the shell: collapsible panels, top bar, shortcuts, graph overlay
   debugger/    ReplayController, timeline, playback bar, transcript
   inspector/   agent / event / tool inspectors
-  graph/       XYFlow workflow editor and pure workflow edits
-  state/       stores
+  graph/       XYFlow workflow graph and pure workflow edits
+  state/       stores, and the actions the bar, panels and shortcuts share
 ```
 
 ## How the pieces hold together
@@ -94,13 +120,13 @@ default `0.3`; purely so live runs are watchable).
 
 ## Status
 
-Phases 1–6 of AGENTS.md §38 are in place (revision 1 of the spec): event protocol, fake
-runtime, pixel world, event → animation, replay, graph editor.
+Phases 1–7 of AGENTS.md §38 are in place: event protocol, fake runtime, pixel world,
+event → animation, replay, graph editor, and the world-first shell.
 
-AGENTS.md revision 2 (2026-10-05) changes the direction from here on: the pixel world
-becomes the primary GUI and the editor, the graph a derived read-only view, and the
-workflow a list of relations ("Anna sends_to Luca") over agents, tools, documents,
-tables and rooms. Next up is Phase 7 (world-first shell); see AGENTS.md §38 for the plan.
+AGENTS.md revision 2 (2026-10-05) sets the direction: the pixel world is the primary
+GUI and becomes the editor, the graph a derived read-only view, and the workflow a list
+of relations ("Anna sends_to Luca") over agents, tools, documents, tables and rooms.
+Next up is Phase 8 (documents); see AGENTS.md §38 for the plan.
 
 Until Phase 10 the runtime still executes a linear chain Start → agent → … → End;
 branching and loops are reported as a `RUN_ERROR`.

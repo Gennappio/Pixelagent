@@ -4,7 +4,7 @@ import { toolLabel } from "../protocol/workflow";
 import { useWorkflowStore } from "../state/workflowStore";
 import { SPRITES } from "../world/sprites";
 
-// Only the deterministic fake model exists until a real provider is wired in (Phase 7).
+// Only the deterministic fake model exists until a real provider is wired in (AGENTS.md §38, Phase 12).
 const MODELS = [{ provider: "fake", name: "scripted-v1", label: "Fake · scripted-v1 (no API key)" }];
 
 export function AgentConfigForm({ agent }: { agent: Agent }) {

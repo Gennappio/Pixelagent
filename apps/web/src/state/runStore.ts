@@ -9,7 +9,12 @@ interface RunState {
   runs: RunSummary[];
   /** The run on screen, if any. Its workflow snapshot is what the world shows. */
   run: Run | null;
-  mode: "idle" | "live" | "replay";
+  /**
+   * build: no run on screen, the world previews the workflow being edited.
+   * run: following a live run. replay: showing a stored one.
+   * Only build edits the workflow; run and replay only read events.
+   */
+  mode: "build" | "run" | "replay";
   error: string | null;
 
   refresh: (workflowId: string) => Promise<void>;
@@ -37,7 +42,7 @@ export const useRunStore = create<RunState>((set, get) => {
     stopStream();
     replay.load([], buildLayout(run.workflow), { streaming: true });
     replay.play();
-    set({ run, mode: "live", error: null });
+    set({ run, mode: "run", error: null });
     closeStream = openRunStream(
       run.id,
       (event) => replay.append(event),
@@ -65,7 +70,7 @@ export const useRunStore = create<RunState>((set, get) => {
   return {
     runs: [],
     run: null,
-    mode: "idle",
+    mode: "build",
     error: null,
 
     refresh: async (workflowId) => {
@@ -80,6 +85,8 @@ export const useRunStore = create<RunState>((set, get) => {
     start: async (workflow, input) => {
       try {
         follow(await api.startRun(workflow.id, input));
+        // List the run while it is still going, not only once it has finished.
+        void get().refresh(workflow.id);
       } catch (error) {
         set({ error: message(error) });
       }
@@ -99,7 +106,7 @@ export const useRunStore = create<RunState>((set, get) => {
 
     close: () => {
       stopStream();
-      set({ run: null, mode: "idle" });
+      set({ run: null, mode: "build" });
     },
   };
 });

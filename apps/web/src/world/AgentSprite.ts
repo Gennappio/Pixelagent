@@ -6,6 +6,7 @@ import type { AgentVisualState } from "./worldState";
 const PIXEL = 3;
 const INK = 0x1a1c2c;
 const FRAME_MS = 170;
+const SELECTED = 0xffd166;
 
 const STATUS_ICON: Record<AgentVisualState["status"], string> = {
   idle: "",
@@ -17,6 +18,8 @@ const STATUS_ICON: Record<AgentVisualState["status"], string> = {
 /** A pixel character on a 12×16 grid, anchored at its feet. */
 export class AgentSprite extends Container {
   private body = new Graphics();
+  /** Marks the character the user has picked. */
+  private ring = new Graphics().ellipse(0, 1, 20, 8).stroke({ color: SELECTED, width: 2 });
   private statusIcon: Text;
   private palette: SpritePalette;
   private drawnKey = "";
@@ -28,7 +31,7 @@ export class AgentSprite extends Container {
     const shadow = new Graphics().ellipse(0, 0, 15, 5).fill({ color: 0x000000, alpha: 0.28 });
     const label = new Text({
       text: agent.name,
-      style: { fontFamily: "monospace", fontSize: 11, fontWeight: "bold", fill: 0xffffff, stroke: { color: INK, width: 3 } },
+      style: { fontFamily: "monospace", fontSize: 11, fontWeight: "bold", fill: 0xffffff, stroke: { color: INK, width: 3, join: "round" } },
       resolution: 3,
     });
     label.anchor.set(0.5, 0);
@@ -36,22 +39,24 @@ export class AgentSprite extends Container {
 
     this.statusIcon = new Text({
       text: "",
-      style: { fontFamily: "monospace", fontSize: 12, fontWeight: "bold", fill: 0xffe066, stroke: { color: INK, width: 3 } },
+      style: { fontFamily: "monospace", fontSize: 12, fontWeight: "bold", fill: 0xffe066, stroke: { color: INK, width: 3, join: "round" } },
       resolution: 3,
     });
     this.statusIcon.anchor.set(0.5, 1);
     this.statusIcon.y = -50;
 
-    this.addChild(shadow, this.body, label, this.statusIcon);
+    this.ring.visible = false;
+    this.addChild(shadow, this.ring, this.body, label, this.statusIcon);
     this.eventMode = "static";
     this.cursor = "pointer";
     this.hitArea = new Rectangle(-20, -52, 40, 72);
     this.on("pointertap", () => onClick(agent.id));
   }
 
-  update(state: AgentVisualState, clock: number): void {
+  update(state: AgentVisualState, clock: number, selected: boolean): void {
     this.position.set(Math.round(state.position.x), Math.round(state.position.y));
     this.zIndex = state.position.y;
+    this.ring.visible = selected;
 
     const frame = state.animation === "idle" ? 0 : Math.floor(clock / FRAME_MS) % 2;
     const key = `${state.animation}|${frame}|${state.facing}`;
