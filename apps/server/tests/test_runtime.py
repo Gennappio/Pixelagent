@@ -151,8 +151,8 @@ async def test_invalid_graph_becomes_a_run_error_event(executor, runs, events):
     assert "Start is not connected" in stored[-1].payload["message"]
 
 
-def test_workflow_round_trips_through_storage(connection):
-    repository = WorkflowRepository(connection)
+def test_workflow_round_trips_through_storage(tmp_path):
+    repository = WorkflowRepository(tmp_path)
     repository.save(demo_workflow())
     assert repository.get("demo") == demo_workflow()
 

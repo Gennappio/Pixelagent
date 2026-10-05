@@ -39,12 +39,13 @@ virtualenv in `apps/server/.venv`, whatever your shell exports.
 ## Layout
 
 ```text
+workflows/     one JSON file per workflow (demo.json is the default one)
 apps/server/server/
   events/      AgentEvent protocol, EventEmitter (stamps id / sequence / timestamp)
   runtime/     AgentRuntime interface, SimpleRuntime, the deterministic FakeModel
   workflow/    workflow schema, graph → execution plan, executor, demo workflow
   tools/       Tool interface and the mock tools (web_search, send_email, calculator)
-  storage/     SQLite: append-only event log, workflows, runs
+  storage/     workflow files; SQLite for runs and the append-only event log
   websocket/   live event fan-out
   main.py      FastAPI app
 apps/web/src/
@@ -69,8 +70,8 @@ apps/web/src/
   feed back into execution.
 - **Execution time ≠ visualization time.** The backend finishes at its own pace; the
   frontend buffers events and animates them at the chosen replay speed.
-- **Everything is saved.** Workflows are stored server-side and can be exported/imported
-  as JSON. Each run stores a snapshot of the workflow it executed plus its full event
+- **Everything is saved.** Each workflow is a file, `workflows/<id>.json`: **Save** in the
+  UI writes it, and a file you add or edit by hand shows up after a page reload. Each run stores a snapshot of the workflow it executed plus its full event
   log; every `AGENT_FINISHED` event carries that agent's context at hand-off. A run can be
   exported to a single JSON file and replayed from that file later.
 
@@ -86,7 +87,8 @@ GET  /runs/{id}/events     GET  /runs/{id}/export
 WS   /runs/{id}/stream
 ```
 
-Server settings (environment): `PIXELAGENTS_DB` (SQLite path, default
+Server settings (environment): `PIXELAGENTS_WORKFLOWS` (workflow folder, default
+`workflows/`), `PIXELAGENTS_DB` (SQLite path for runs and events, default
 `apps/server/data/pixelagents.db`), `PIXELAGENTS_PACE` (seconds between runtime steps,
 default `0.3`; purely so live runs are watchable).
 

@@ -4,43 +4,6 @@ import sqlite3
 from pathlib import Path
 
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS workflows (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    input TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS agents (
-    workflow_id TEXT NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
-    id TEXT NOT NULL,
-    ordinal INTEGER NOT NULL,
-    definition_json TEXT NOT NULL,
-    PRIMARY KEY (workflow_id, id)
-);
-
-CREATE TABLE IF NOT EXISTS workflow_nodes (
-    workflow_id TEXT NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
-    id TEXT NOT NULL,
-    ordinal INTEGER NOT NULL,
-    type TEXT NOT NULL,
-    agent_id TEXT,
-    tool TEXT,
-    x REAL NOT NULL,
-    y REAL NOT NULL,
-    PRIMARY KEY (workflow_id, id)
-);
-
-CREATE TABLE IF NOT EXISTS workflow_edges (
-    workflow_id TEXT NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
-    id TEXT NOT NULL,
-    ordinal INTEGER NOT NULL,
-    source TEXT NOT NULL,
-    target TEXT NOT NULL,
-    PRIMARY KEY (workflow_id, id)
-);
-
 CREATE TABLE IF NOT EXISTS runs (
     id TEXT PRIMARY KEY,
     workflow_id TEXT NOT NULL,

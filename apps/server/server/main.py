@@ -16,7 +16,7 @@ from server.storage.run_repository import RunRepository
 from server.storage.workflow_repository import WorkflowRepository
 from server.tools.base import default_registry
 from server.websocket.manager import RunStreamManager
-from server.workflow.demo import DEMO_WORKFLOW_ID, demo_workflow
+from server.workflow.demo import DEMO_WORKFLOW_ID, WORKFLOWS_DIR, demo_workflow
 from server.workflow.executor import WorkflowExecutor
 from server.workflow.models import (
     Run,
@@ -32,9 +32,13 @@ from server.workflow.models import (
 DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "pixelagents.db"
 
 
-def create_app(db_path: str | Path | None = None, runtime: AgentRuntime | None = None) -> FastAPI:
+def create_app(
+    db_path: str | Path | None = None,
+    runtime: AgentRuntime | None = None,
+    workflows_dir: str | Path | None = None,
+) -> FastAPI:
     connection = connect(db_path or os.environ.get("PIXELAGENTS_DB", DEFAULT_DB_PATH))
-    workflows = WorkflowRepository(connection)
+    workflows = WorkflowRepository(workflows_dir or os.environ.get("PIXELAGENTS_WORKFLOWS", WORKFLOWS_DIR))
     runs = RunRepository(connection)
     events = EventRepository(connection)
     streams = RunStreamManager()

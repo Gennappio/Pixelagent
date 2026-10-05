@@ -2,70 +2,16 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from server.workflow.models import Workflow
 
 DEMO_WORKFLOW_ID = "demo"
 
+# <repo>/workflows: one JSON file per workflow, including the demo.
+WORKFLOWS_DIR = Path(__file__).resolve().parents[4] / "workflows"
+
 
 def demo_workflow() -> Workflow:
-    return Workflow.model_validate(
-        {
-            "id": DEMO_WORKFLOW_ID,
-            "name": "Sales report demo",
-            "input": "Find the latest sales number and send it to management.",
-            "agents": [
-                {
-                    "id": "anna",
-                    "name": "Anna",
-                    "role": "Manager",
-                    "systemPrompt": "Coordinate the task and delegate work.",
-                    "model": {
-                        "provider": "fake",
-                        "name": "scripted-v1",
-                        "script": {"message": "Find the latest sales number."},
-                    },
-                    "tools": [],
-                    "appearance": {"sprite": "agent_female_01"},
-                },
-                {
-                    "id": "luca",
-                    "name": "Luca",
-                    "role": "Researcher",
-                    "systemPrompt": "Research the request using the available tools and report the findings.",
-                    "model": {
-                        "provider": "fake",
-                        "name": "scripted-v1",
-                        "script": {"message": "Send this result to management: {result}"},
-                    },
-                    "tools": [{"name": "web_search"}],
-                    "appearance": {"sprite": "agent_male_01"},
-                },
-                {
-                    "id": "gianni",
-                    "name": "Gianni",
-                    "role": "Communication",
-                    "systemPrompt": "Deliver results to the right people.",
-                    "model": {"provider": "fake", "name": "scripted-v1"},
-                    "tools": [{"name": "send_email"}],
-                    "appearance": {"sprite": "agent_male_02"},
-                },
-            ],
-            "nodes": [
-                {"id": "start", "type": "start", "position": {"x": 40, "y": 40}},
-                {"id": "node_anna", "type": "agent", "agentId": "anna", "position": {"x": 0, "y": 140}},
-                {"id": "node_luca", "type": "agent", "agentId": "luca", "position": {"x": 0, "y": 280}},
-                {"id": "node_search", "type": "tool", "tool": "web_search", "position": {"x": 280, "y": 290}},
-                {"id": "node_gianni", "type": "agent", "agentId": "gianni", "position": {"x": 0, "y": 420}},
-                {"id": "node_email", "type": "tool", "tool": "send_email", "position": {"x": 280, "y": 430}},
-                {"id": "end", "type": "end", "position": {"x": 40, "y": 560}},
-            ],
-            "edges": [
-                {"id": "e_start_anna", "source": "start", "target": "node_anna"},
-                {"id": "e_anna_luca", "source": "node_anna", "target": "node_luca"},
-                {"id": "e_luca_search", "source": "node_luca", "target": "node_search"},
-                {"id": "e_luca_gianni", "source": "node_luca", "target": "node_gianni"},
-                {"id": "e_gianni_email", "source": "node_gianni", "target": "node_email"},
-                {"id": "e_gianni_end", "source": "node_gianni", "target": "end"},
-            ],
-        }
-    )
+    return Workflow.model_validate(json.loads((WORKFLOWS_DIR / f"{DEMO_WORKFLOW_ID}.json").read_text("utf-8")))

@@ -1,3 +1,4 @@
+import json
 import time
 
 import pytest
@@ -11,7 +12,11 @@ from server.workflow.demo import demo_workflow
 
 @pytest.fixture
 def client(tmp_path):
-    app = create_app(tmp_path / "test.db", runtime=SimpleRuntime(default_registry(), pace=0.01))
+    app = create_app(
+        tmp_path / "test.db",
+        runtime=SimpleRuntime(default_registry(), pace=0.01),
+        workflows_dir=tmp_path / "workflows",
+    )
     with TestClient(app) as client:
         yield client
 
@@ -25,9 +30,10 @@ def wait_for_run(client, run_id):
     raise AssertionError("run did not finish")
 
 
-def test_demo_workflow_is_seeded(client):
-    assert client.get("/workflows").json()[0]["id"] == "demo"
+def test_demo_workflow_is_seeded(client, tmp_path):
+    assert [summary["id"] for summary in client.get("/workflows").json()] == ["demo"]
     assert client.get("/workflows/demo").json() == demo_workflow().to_wire()
+    assert (tmp_path / "workflows" / "demo.json").is_file()
 
 
 def test_create_and_update_workflow(client):
@@ -49,7 +55,26 @@ def test_invalid_workflow_is_rejected(client):
     assert client.post("/workflows", json=definition).status_code == 422
 
 
+def test_saved_workflows_are_json_files_in_the_workflows_folder(client, tmp_path):
+    definition = {k: v for k, v in demo_workflow().to_wire().items() if k != "id"}
+    workflow_id = client.post("/workflows", json={**definition, "name": "On disk"}).json()["id"]
+
+    stored = json.loads((tmp_path / "workflows" / f"{workflow_id}.json").read_text("utf-8"))
+    assert stored == {**definition, "name": "On disk", "id": workflow_id}
+
+
+def test_a_workflow_file_dropped_in_the_folder_is_picked_up(client, tmp_path):
+    wire = {**demo_workflow().to_wire(), "name": "Hand written"}
+    (tmp_path / "workflows" / "by_hand.json").write_text(json.dumps(wire), "utf-8")
+    (tmp_path / "workflows" / "broken.json").write_text("{ not json", "utf-8")
+
+    assert [summary["id"] for summary in client.get("/workflows").json()] == ["by_hand", "demo"]
+    assert client.get("/workflows/by_hand").json()["name"] == "Hand written"
+    assert client.post("/workflows/by_hand/run").status_code == 202
+
+
 def test_unknown_resources_return_404(client):
+    assert client.get("/workflows/..%2Fpyproject").status_code == 404
     assert client.get("/workflows/nope").status_code == 404
     assert client.post("/workflows/nope/run").status_code == 404
     assert client.get("/runs/nope/events").status_code == 404
