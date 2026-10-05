@@ -94,7 +94,13 @@ default `0.3`; purely so live runs are watchable).
 
 ## Status
 
-Phases 1–6 of AGENTS.md §37 are in place (event protocol, fake runtime, pixel world,
-event → animation, replay, graph editor). Not yet done: a real LLM-backed agent
-(Phase 7) and real tools (Phase 8). The runtime currently executes a linear chain
-Start → agent → … → End; branching and loops are reported as a `RUN_ERROR`.
+Phases 1–6 of AGENTS.md §38 are in place (revision 1 of the spec): event protocol, fake
+runtime, pixel world, event → animation, replay, graph editor.
+
+AGENTS.md revision 2 (2026-10-05) changes the direction from here on: the pixel world
+becomes the primary GUI and the editor, the graph a derived read-only view, and the
+workflow a list of relations ("Anna sends_to Luca") over agents, tools, documents,
+tables and rooms. Next up is Phase 7 (world-first shell); see AGENTS.md §38 for the plan.
+
+Until Phase 10 the runtime still executes a linear chain Start → agent → … → End;
+branching and loops are reported as a `RUN_ERROR`.
