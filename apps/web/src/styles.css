@@ -1104,6 +1104,150 @@ button.link {
   margin: 0;
 }
 
+/* building on the characters: the menu on a thing, and the bar shown while a target is picked */
+
+.build-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  /* Only the menu and the bar take clicks: everything else goes through to the office. */
+  pointer-events: none;
+}
+
+.build-menu {
+  position: absolute;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  background: rgba(28, 31, 46, 0.98);
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  box-shadow:
+    inset 0 0 0 1px var(--border),
+    4px 4px 0 rgba(0, 0, 0, 0.35);
+}
+
+.build-menu.floor-menu {
+  width: 220px;
+}
+
+.build-menu-header {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 6px 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.build-menu-header strong {
+  color: var(--accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.build-menu-header small {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.build-menu-header .spacer {
+  flex: 1;
+}
+
+.build-menu-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.build-menu-body p {
+  margin: 0;
+}
+
+.build-menu-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.slots {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* A sentence is added by saying its verb here: one button for each thing that can be said. */
+.build-menu .relation-add button {
+  flex: none;
+  padding: 2px 7px;
+  font-size: 12px;
+}
+
+.picking-bar {
+  position: absolute;
+  top: var(--hud-gap);
+  left: calc(var(--inset-left) + var(--hud-gap));
+  right: calc(var(--inset-right) + var(--hud-gap));
+  margin: 0 auto;
+  max-width: 620px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 7px 10px;
+  pointer-events: auto;
+  background: rgba(28, 31, 46, 0.98);
+  border: 2px solid var(--accent);
+  border-radius: 6px;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35);
+}
+
+.picking-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.picking-line strong {
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.picking-line .spacer {
+  flex: 1;
+}
+
+.palette {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.palette button {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 3px 8px;
+}
+
+.palette button small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.add-things button {
+  flex: 1;
+  padding-left: 4px;
+  padding-right: 4px;
+  white-space: nowrap;
+}
+
 /* dock: the timeline drawer and the playback bar */
 
 .dock {

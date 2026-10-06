@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { addRelation, canRelate, moveRelation, objectChoices, removeRelation, updateRelation } from "../build/workflowEdits";
+import { hasTargets, pickTargets, type PendingSentence } from "../build/picking";
+import { addRelation, canRelate, moveRelation, removeRelation, updateRelation } from "../build/workflowEdits";
 import {
   canConsultFirst,
   closesCycle,
@@ -14,6 +14,7 @@ import {
   slotOf,
   SLOTS,
   verbInfo,
+  type Phrase,
   type Slot,
 } from "../protocol/relations";
 import { toolLabel, type Agent, type Relation, type Workflow } from "../protocol/workflow";
@@ -26,6 +27,15 @@ interface Props {
   agent: Agent;
   /** Build mode. Otherwise the sentences are only shown: a run is read as it was executed. */
   editable: boolean;
+}
+
+/** Why a phrase cannot be added just now, for whoever hovers its button. */
+function whyNot(phrase: Phrase): string {
+  const kind = verbInfo(phrase.verb).objectKind;
+  if (kind === null) return "It already is.";
+  if (kind === "agent") return "There is nobody else to choose.";
+  if (kind === "table") return phrase.verb === "takes_from_table" ? "No pile to choose: click the floor to add one." : phrase.verb === "reads_table" ? "No shared table to choose: click the floor to add one." : "No table to choose: click the floor to add one.";
+  return phrase.required ? "No tool that can be consulted first is left to choose." : "It can already use every tool there is.";
 }
 
 function target(workflow: Workflow, relation: Relation): string {
@@ -118,64 +128,52 @@ function Sentence({ workflow, relation, editable, first, last }: { workflow: Wor
   );
 }
 
-/** What can be added to a slot: a phrase, then what it applies to. */
-function AddSentence({ workflow, agent, slot }: { workflow: Workflow; agent: Agent; slot: Slot }) {
+/**
+ * What can be added to a slot. A sentence is said in two moves: the verb here, on the
+ * character, and then what it applies to, picked in the office. A verb that applies to
+ * nothing (being the entry, being the exit) is added at once.
+ */
+function AddByPicking({ workflow, agent, slot }: { workflow: Workflow; agent: Agent; slot: Slot }) {
   const tools = useWorkflowStore((state) => state.tools);
   const edit = useWorkflowStore((state) => state.edit);
-  const phrases = phrasesIn(slot);
-  const [key, setKey] = useState(phrases[0].key);
-  const [picked, setPicked] = useState("");
-  const phrase = phrases.find((candidate) => candidate.key === key) ?? phrases[0];
-  const kind = verbInfo(phrase.verb).objectKind;
-  const how = { required: phrase.required, tools };
-  const choices = objectChoices(workflow, agent.id, phrase.verb, how);
-  // The object on offer: what was picked if it is still a choice, else the first one.
-  const object = kind === null ? undefined : (choices.find((choice) => choice.id === picked) ?? choices[0])?.id;
-  const addable = canRelate(workflow, agent.id, phrase.verb, object, how);
+  const startPicking = useUiStore((state) => state.startPicking);
 
   return (
-    <>
-      <div className="relation-add">
-        <select aria-label={`What to add to what ${SLOTS.find((candidate) => candidate.slot === slot)!.title.toLowerCase()}`} value={phrase.key} onChange={(event) => setKey(event.target.value)}>
-          {phrases.map((candidate) => (
-            <option key={candidate.key} value={candidate.key}>
-              {candidate.phrase}
-            </option>
-          ))}
-        </select>
-        {kind !== null && (
-          <select aria-label="To whom or what" value={object ?? ""} disabled={choices.length === 0} onChange={(event) => setPicked(event.target.value)}>
-            {choices.length === 0 && <option value="">{kind === "table" ? "no table to choose" : `no ${kind} to choose`}</option>}
-            {choices.map((choice) => (
-              <option key={choice.id} value={choice.id}>
-                {kind === "tool" ? toolLabel(choice.label) : choice.label}
-              </option>
-            ))}
-          </select>
-        )}
-        <button type="button" disabled={!addable} onClick={() => edit((current) => addRelation(current, agent.id, phrase.verb, object, how))}>
-          Add
-        </button>
-      </div>
-      <small>{phrase.meaning}</small>
-    </>
+    <div className="relation-add">
+      {phrasesIn(slot).map((phrase) => {
+        const alone = verbInfo(phrase.verb).objectKind === null;
+        const pending: PendingSentence = { subject: agent.id, verb: phrase.verb, ...(phrase.required ? { required: true } : {}) };
+        const possible = alone ? canRelate(workflow, agent.id, phrase.verb) : hasTargets(pickTargets(workflow, pending, tools));
+        return (
+          <button
+            key={phrase.key}
+            type="button"
+            disabled={!possible}
+            title={possible ? (alone ? phrase.meaning : `${phrase.meaning} Then pick it in the office.`) : whyNot(phrase)}
+            onClick={() => (alone ? edit((current) => addRelation(current, agent.id, phrase.verb)) : startPicking(pending))}
+          >
+            + {phrase.phrase}
+            {!alone && " …"}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
 /**
  * What an agent does, as sentences in its three slots: what arrives, what it consults,
- * where its sheet goes. This is where a workflow is put together: in each slot pick a
- * phrase, pick what it applies to, add. Within a slot the order of the sentences is the
- * order things happen in.
+ * where its sheet goes. Editable, this is where a workflow is put together, on the
+ * character itself. Within a slot the order of the sentences is the order things happen in.
  */
-export function RelationEditor({ workflow, agent, editable }: Props) {
+export function Slots({ workflow, agent, editable }: Props) {
   const select = useUiStore((state) => state.select);
+  const openMenu = useUiStore((state) => state.openMenu);
   // The hand-offs others make to this agent are part of what arrives for it, and are theirs to change.
   const incoming = handedBy(workflow, agent.id);
 
   return (
-    <fieldset className="relations">
-      <legend>What {agent.name} does</legend>
+    <div className="slots">
       {SLOTS.map(({ slot, title, about }) => {
         const own = slotOf(workflow, agent.id, slot);
         const others = slot === "arrives" ? incoming : [];
@@ -196,7 +194,12 @@ export function RelationEditor({ workflow, agent, editable }: Props) {
                       {!isRequired(relation) && " if it chooses"}
                     </div>
                     {sender && (
-                      <button type="button" className="link" onClick={() => select({ kind: "agent", agentId: sender.id })}>
+                      <button
+                        type="button"
+                        className="link"
+                        // While building, the sender's sentences are on the sender; in a run, in its inspector.
+                        onClick={() => (editable ? openMenu({ kind: "agent", agentId: sender.id }) : select({ kind: "agent", agentId: sender.id }))}
+                      >
                         go to {sender.name}
                       </button>
                     )}
@@ -204,10 +207,20 @@ export function RelationEditor({ workflow, agent, editable }: Props) {
                 );
               })}
             </ol>
-            {editable && <AddSentence workflow={workflow} agent={agent} slot={slot} />}
+            {editable && <AddByPicking workflow={workflow} agent={agent} slot={slot} />}
           </section>
         );
       })}
+    </div>
+  );
+}
+
+/** The three slots under a heading, as the inspector shows them for a run: read, not changed. */
+export function RelationEditor({ workflow, agent, editable }: Props) {
+  return (
+    <fieldset className="relations">
+      <legend>What {agent.name} does</legend>
+      <Slots workflow={workflow} agent={agent} editable={editable} />
     </fieldset>
   );
 }

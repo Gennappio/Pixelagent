@@ -181,15 +181,19 @@ Phase 12  the camera: it rests on whole zoom steps, and "fit" is the largest at 
           the room fits beside the open panels; pinch or Ctrl / ⌘ + wheel zooms around
           the pointer, the wheel alone and dragging the floor pan, double-click
           re-frames; − + keys and two buttons on the playback bar; speed on , .
+Phase 13  building on the characters: a menu on a character, a table, a station and the
+          floor, laid over the canvas and following the camera; the three slots edited
+          in the character's menu, a sentence finished by picking its target in the
+          room, which dims but for what the verb accepts; things dragged about, their
+          places saved with the workflow; the inspector keeps the configuration form
 ```
 
-Not done: everything in §38 from Phase 13 on. Revision 3 rewrote the plan from
+Not done: everything in §38 from Phase 14 on. Revision 3 rewrote the plan from
 Phase 11: Phases 11–14 are the changes this revision makes (the three slots and
 the spoken message, the camera, building on the characters, the game
 interface), and the phases of revision 2 follow them, renumbered. Today a
-workflow is built by adding agents and tables in the Office panel and saying
-what each agent does in its inspector, slot by slot, and the panels are the
-plain ones of Phase 7.
+workflow is built in the office itself, on the characters, with no graph on
+screen; the panels are still the plain ones of Phase 7.
 
 The deterministic demo in §34 passes and must keep passing after every phase.
 
@@ -1033,20 +1037,10 @@ them, are at the end of the playback bar and on the thin strip it collapses to.
 
 # 24. Build Mode
 
-What exists today: agents and tables are added in the Office panel, and what
-an agent does is said in its inspector, in the three slots of §7: in a slot
-pick a phrase, pick what it applies to, add. Each sentence can be reordered
-within its slot, removed, set to "always" or "if it chooses" (handing over and
-writing), or switched between "can use" and "consults first" (a tool with one
-text argument). The hand-offs others make to the agent are listed greyed among
-what arrives, with a jump to the sender. A router's rules, and what a scripted
-agent says and writes, are edited there too. The Office panel says what a
-workflow still lacks before it can run, a tool consulted first that cannot be
-among it.
-
-Where it goes: the sentences are edited on the characters and objects
-themselves, and the inspector keeps only the configuration form. Nothing is
-connected by dragging; a target is picked in the world.
+The sentences are edited on the characters and objects themselves, and the
+inspector keeps only the configuration form. Nothing is connected by dragging;
+a target is picked in the world. This is built (Phase 13); what was settled
+while building it is listed in §38.
 
 ```text
 click a character      a menu in a bubble where the character stands:
@@ -1217,9 +1211,11 @@ pixel-agents/
     world/                  PixelWorld.ts, AgentSprite.ts, DocumentSprite.ts, Furniture.ts (trays, tables),
                             Room.ts, Devices.ts, ToolStation.ts, SpeechBubble.ts, sprites.ts,
                             Camera.ts (zoom steps, gestures), layout.ts, worldState.ts
-    build/                  workflowEdits.ts, scriptEdits.ts (what a scripted agent says and writes)
-                            (later: ContextMenu.tsx, picking.ts (the pending sentence and what it
-                            lights), Palette.tsx, dragMove.ts)
+    build/                  workflowEdits.ts, scriptEdits.ts (what a scripted agent says and writes),
+                            picking.ts (the pending sentence and what it lights), dragMove.ts (where
+                            things stand), menuPlacement.ts, BuildOverlay.tsx, ContextMenu.tsx (the
+                            menu on a character, a table, a station, the floor), PickingBar.tsx (what
+                            is being picked, and the tools with no station yet)
     graph/                  GraphView.tsx (read-only), deriveGraph.ts, nodes.tsx
     hud/                    panels.ts (state, persistence, insets), shortcuts.ts (the table),
                             useShortcuts.ts, Panel.tsx, TopBar.tsx, OfficePanel.tsx,
@@ -1408,7 +1404,7 @@ it, fork the run. Do not start it before replay and relations are stable.
 
 # 38. Development Order
 
-Phases 1–12 are done (§4). Each phase below ends with `npm test` green and
+Phases 1–13 are done (§4). Each phase below ends with `npm test` green and
 the demo of §34 passing. Do not start a phase before the previous one is
 merged.
 
@@ -1567,7 +1563,7 @@ cameraStore      what the interface knows of the camera (the step it rests at, w
                  framing here, to lay menus over the canvas
 ```
 
-## Phase 13 — Build on the characters
+## Phase 13 — Build on the characters (done)
 
 ```text
 context menu on a character, a table, a station and the floor (§24), as HTML that follows
@@ -1580,6 +1576,44 @@ drag to move things; layout positions saved with the workflow; dragging never co
 the floor menu adds a character or a table
 the Office panel keeps the file-level view: name, task, what the workflow lacks, runs
 the world never touches a run
+```
+
+Settled while building it, where this document left room:
+
+```text
+adding           each slot has one button per thing that can be said there. A verb that
+                 applies to nothing (is the entry, is the exit) is added at once; the
+                 others start a pick. One with nothing to pick is not offered, and says why
+tools            while a tool is being picked, the stations in the room are lit, and the
+                 tools nobody has yet are listed in the bar at the top that says what is
+                 being picked, each with whether it can be consulted first. No icons yet
+a click away     on the floor it gives up a pick, else closes the menu that is open, else
+                 opens the floor menu at that spot. On the thing whose menu is open, it
+                 closes it. On anything that stays dim during a pick, it does nothing
+Esc              also works from a field: it types nothing, and gets out of what is open.
+                 A pick first, then the graph, then the menu, then the selection
+the menu         beside its thing, on the side with room, inside the space the side panels
+                 leave free, centred on it and kept on screen; taller than the stage, it
+                 scrolls. It reads the camera's framing from cameraStore on every change
+places           with nothing placed by hand, things stand where they always did. The first
+                 time something is put down or dragged, where everything stands is written
+                 into layout.positions, so nobody shifts afterwards. A thing with no place
+                 of its own (a station for a tool just given) takes the nearest free spot
+                 to its usual one. Each kind has bounds that keep it on the floor
+dragging         a press that travels more than four pixels is a drag, and the click that
+                 ends it is not a click on the thing. Stations can be moved too; the trays
+                 follow the agents they stand by
+the form         name, role, who decides, prompt, script, sprite, a router's rules. No
+                 instances and no room yet: they come with Phases 17 and 18, when a run can
+                 use them. A table's menu has its scope, which one room makes moot for now
+newcomers        a new character gets the look fewest others have, so three added in a row
+                 can be told apart
+the Office panel while building: the file, what it lacks, three buttons that add (a
+                 character, a table, a pile) and the runs. With a run on screen it still
+                 lists what that run had in it: agents, tools, tables and every sheet,
+                 which is the way back to a sheet that was filed
+a station's menu says what the tool is and who has it, and changes nothing: a station
+                 stands for as long as someone can use its tool
 ```
 
 ## Phase 14 — The game interface

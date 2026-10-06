@@ -1,4 +1,5 @@
 import { useEffect, useMemo, type CSSProperties } from "react";
+import { BuildOverlay } from "./build/BuildOverlay";
 import { PlaybackBar } from "./debugger/PlaybackBar";
 import { Timeline } from "./debugger/Timeline";
 import { Transcript } from "./debugger/TranscriptPanel";
@@ -84,6 +85,7 @@ export function App() {
 
       <main className="stage" style={geometry}>
         <WorldView insets={insets} />
+        <BuildOverlay insets={insets} />
         {panels.graph && <GraphOverlay workflow={shown} executed={mode !== "build"} resetKey={run?.id ?? workflow.id} />}
 
         <div className="hud-column left">

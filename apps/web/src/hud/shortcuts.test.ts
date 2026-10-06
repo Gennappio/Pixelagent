@@ -41,9 +41,16 @@ describe("shortcutFor", () => {
   });
 
   it("never fires a plain shortcut while the user is typing", () => {
-    for (const shortcut of SHORTCUTS.filter((candidate) => !candidate.mod)) {
+    for (const shortcut of SHORTCUTS.filter((candidate) => !candidate.mod && !candidate.whileTyping)) {
       expect(press(shortcut.keys[0], { target: "editable" })).toBeNull();
     }
+  });
+
+  it("lets Esc through from a field: it types nothing, and gets out of whatever is open", () => {
+    expect(press("Escape", { target: "editable" })).toEqual({ type: "escape" });
+    expect(press("Escape")).toEqual({ type: "escape" });
+    // It is the only one.
+    expect(SHORTCUTS.filter((shortcut) => shortcut.whileTyping).map((shortcut) => shortcut.keys)).toEqual([["Escape"]]);
   });
 
   it("lets Ctrl or ⌘ shortcuts through even from a text field", () => {

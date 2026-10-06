@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { entryOf, sentence } from "../protocol/relations";
 import type { ToolDescription, Workflow } from "../protocol/workflow";
 import { demoWorkflow, tablesWorkflow } from "../testing/demoRun";
+import { buildLayout } from "../world/layout";
 import {
   addAgent,
   addRelation,
@@ -35,6 +36,20 @@ describe("agents", () => {
     expect(second.agent).toMatchObject({ name: "Agent 2", roomId: "office", instances: 1 });
   });
 
+  it("gives each newcomer a look the fewest others have, so they can be told apart", () => {
+    let office = emptyWorkflow();
+    const looks: string[] = [];
+    for (let index = 0; index < 5; index++) {
+      const added = addAgent(office);
+      office = added.workflow;
+      looks.push(added.agent.appearance.sprite);
+    }
+    expect(looks.slice(0, 4)).toEqual(["agent_male_01", "agent_female_01", "agent_male_02", "agent_female_02"]);
+    expect(looks[4]).toBe("agent_male_01"); // everyone has one: start again
+    // In the demo Anna has the red jacket, Luca the blue shirt, Gianni the green one: a fourth gets what is left.
+    expect(addAgent(demoWorkflow).agent.appearance.sprite).toBe("agent_female_02");
+  });
+
   it("changes an agent without touching the others", () => {
     const renamed = updateAgent(demoWorkflow, "luca", { name: "Luke" });
     expect(renamed.agents.map((agent) => agent.name)).toEqual(["Anna", "Luke", "Gianni"]);
@@ -53,6 +68,43 @@ describe("agents", () => {
     // "luca" as a tool name is a tool, whatever agents are called.
     const odd = addRelation(demoWorkflow, "anna", "uses_tool", "luca");
     expect(say(removeAgent(odd, "luca"))).toContain("Anna can use luca");
+  });
+});
+
+describe("putting things down in the room", () => {
+  it("adds a character where it is put, and moves nobody to make room", () => {
+    const before = buildLayout(demoWorkflow);
+    const added = addAgent(demoWorkflow, { x: 100.6, y: 330.2 });
+    const after = buildLayout(added.workflow);
+    expect(after.homes[added.agent.id]).toEqual({ x: 101, y: 330 });
+    for (const id of ["anna", "luca", "gianni"]) expect(after.homes[id]).toEqual(before.homes[id]);
+    expect(after.stations).toEqual(before.stations);
+    // Added from a list, with nowhere in particular to stand, it takes its place among the others as before.
+    const anywhere = addAgent(demoWorkflow);
+    expect(anywhere.workflow.layout.positions).toEqual({});
+    expect(Object.keys(buildLayout(anywhere.workflow).homes)).toHaveLength(4);
+  });
+
+  it("adds a table or a pile where it is put, inside the room", () => {
+    const table = addTable(demoWorkflow, "shared", { x: 200, y: 320 });
+    expect(buildLayout(table.workflow).tablePositions[table.table.id]).toEqual({ x: 200, y: 320 });
+    const pile = addTable(table.workflow, "pile", { x: -50, y: 5000 });
+    const at = buildLayout(pile.workflow).tablePositions[pile.table.id];
+    expect(at.x).toBeGreaterThan(0);
+    expect(at.y).toBeLessThan(400);
+    expect(buildLayout(pile.workflow).tablePositions[table.table.id]).toEqual({ x: 200, y: 320 });
+  });
+
+  it("forgets where something stood when it is removed", () => {
+    const added = addAgent(demoWorkflow, { x: 100, y: 330 });
+    const gone = removeAgent(added.workflow, added.agent.id);
+    expect(added.agent.id in added.workflow.layout.positions).toBe(true);
+    expect(added.agent.id in gone.layout.positions).toBe(false);
+    // The others stay written down where they stood.
+    expect(buildLayout(gone)).toEqual(buildLayout(demoWorkflow));
+
+    const table = addTable(demoWorkflow, "pile", { x: 300, y: 340 });
+    expect(Object.keys(removeTable(table.workflow, table.table.id).layout.positions).some((key) => key.startsWith("table:"))).toBe(false);
   });
 });
 

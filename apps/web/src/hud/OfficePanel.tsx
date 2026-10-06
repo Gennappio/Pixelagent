@@ -48,14 +48,17 @@ function useJsonFile(onLoad: (data: any) => void) {
 }
 
 /**
- * What is in the office: the workflow file, its agents, tools and tables, and the stored
- * runs. Everything that changes the workflow is offered in build mode only.
+ * The workflow as a file: its name, its task, what it still lacks before it can run, what
+ * adds things to the office, and the stored runs. The office itself is built on the
+ * characters, in the world. With a run on screen the panel lists what that run had in it:
+ * agents, tools, tables and every sheet.
  */
 export function OfficePanel() {
   const { workflow, workflows, tools, dirty, edit, open, save, createNew, importWorkflow } = useWorkflowStore();
   const { runs, run, open: openRun, openExport } = useRunStore();
   const selection = useUiStore((state) => state.selection);
   const select = useUiStore((state) => state.select);
+  const openMenu = useUiStore((state) => state.openMenu);
 
   const building = run === null;
   /** With a run on screen the lists describe what was executed, not what is being edited. */
@@ -141,6 +144,41 @@ export function OfficePanel() {
                 {reason}
               </p>
             ))}
+            <div className="button-row add-things">
+              <button
+                title="Add a character to the office"
+                onClick={() => {
+                  const added = addAgent(workflow);
+                  edit(() => added.workflow);
+                  openMenu({ kind: "agent", agentId: added.agent.id });
+                }}
+              >
+                + character
+              </button>
+              <button
+                title="Add a shared table: sheets on it are read and rewritten"
+                onClick={() => {
+                  const added = addTable(workflow, "shared");
+                  edit(() => added.workflow);
+                  openMenu({ kind: "table", tableId: added.table.id });
+                }}
+              >
+                + table
+              </button>
+              <button
+                title="Add a pile: sheets on it are taken one at a time"
+                onClick={() => {
+                  const added = addTable(workflow, "pile");
+                  edit(() => added.workflow);
+                  openMenu({ kind: "table", tableId: added.table.id });
+                }}
+              >
+                + pile
+              </button>
+            </div>
+            <p className="muted">
+              Or click the floor where you want one. Click a character to say what it does, and drag anything to move it.
+            </p>
           </>
         ) : (
           <>
@@ -156,103 +194,57 @@ export function OfficePanel() {
         )}
       </Section>
 
-      <Section
-        id="office.agents"
-        title="Agents"
-        actions={
-          building && (
-            <button
-              title="Add an agent to the office"
-              onClick={() => {
-                const added = addAgent(workflow);
-                edit(() => added.workflow);
-                select({ kind: "agent", agentId: added.agent.id });
-              }}
-            >
-              +
-            </button>
-          )
-        }
-      >
-        <ul className="list">
-          {shown.agents.map((agent) => (
-            <li
-              key={agent.id}
-              className={`row clickable${selection?.kind === "agent" && selection.agentId === agent.id ? " selected" : ""}`}
-              onClick={() => select({ kind: "agent", agentId: agent.id })}
-            >
-              <span className="dot" style={{ background: cssColor(spriteFor(agent.appearance.sprite).shirt) }} />
-              {agent.name} <span className="muted">{agent.role}</span>
-            </li>
-          ))}
-          {shown.agents.length === 0 && <li className="muted">No agents yet.</li>}
-        </ul>
-        {building && shown.agents.length > 0 && <p className="muted">Select an agent to say what it does.</p>}
-      </Section>
-
-      <Section id="office.tools" title="Tools">
-        <ul className="list">
-          {(building ? tools.map((tool) => tool.name) : inUse).map((name) => (
-            <li
-              key={name}
-              className={`row clickable${selection?.kind === "tool" && selection.tool === name ? " selected" : ""}`}
-              title={tools.find((tool) => tool.name === name)?.description}
-              onClick={() => select({ kind: "tool", tool: name })}
-            >
-              {toolLabel(name)}
-              {building && inUse.includes(name) && <span className="tag">in office</span>}
-            </li>
-          ))}
-          {!building && inUse.length === 0 && <li className="muted">This run used no tools.</li>}
-        </ul>
-        {building && <p className="muted">A tool gets a station when an agent can use it.</p>}
-      </Section>
-
-      {(building || shown.tables.length > 0) && (
-        <Section
-          id="office.tables"
-          title="Tables"
-          actions={
-            building && (
-              <>
-                <button
-                  title="Add a shared table: sheets on it are read and rewritten"
-                  onClick={() => {
-                    const added = addTable(workflow, "shared");
-                    edit(() => added.workflow);
-                    select({ kind: "table", tableId: added.table.id });
-                  }}
+      {!building && (
+        <>
+          <Section id="office.agents" title="Agents">
+            <ul className="list">
+              {shown.agents.map((agent) => (
+                <li
+                  key={agent.id}
+                  className={`row clickable${selection?.kind === "agent" && selection.agentId === agent.id ? " selected" : ""}`}
+                  onClick={() => select({ kind: "agent", agentId: agent.id })}
                 >
-                  + table
-                </button>
-                <button
-                  title="Add a pile: sheets on it are taken one at a time"
-                  onClick={() => {
-                    const added = addTable(workflow, "pile");
-                    edit(() => added.workflow);
-                    select({ kind: "table", tableId: added.table.id });
-                  }}
+                  <span className="dot" style={{ background: cssColor(spriteFor(agent.appearance.sprite).shirt) }} />
+                  {agent.name} <span className="muted">{agent.role}</span>
+                </li>
+              ))}
+              {shown.agents.length === 0 && <li className="muted">No agents.</li>}
+            </ul>
+          </Section>
+
+          <Section id="office.tools" title="Tools">
+            <ul className="list">
+              {inUse.map((name) => (
+                <li
+                  key={name}
+                  className={`row clickable${selection?.kind === "tool" && selection.tool === name ? " selected" : ""}`}
+                  title={tools.find((tool) => tool.name === name)?.description}
+                  onClick={() => select({ kind: "tool", tool: name })}
                 >
-                  + pile
-                </button>
-              </>
-            )
-          }
-        >
-          <ul className="list">
-            {shown.tables.map((table) => (
-              <li
-                key={table.id}
-                className={`row clickable${selection?.kind === "table" && selection.tableId === table.id ? " selected" : ""}`}
-                onClick={() => select({ kind: "table", tableId: table.id })}
-              >
-                {table.name || table.id}
-                <span className="tag">{table.mode === "pile" ? "pile" : "shared"}</span>
-              </li>
-            ))}
-            {shown.tables.length === 0 && <li className="muted">No tables: sheets only pass from hand to hand.</li>}
-          </ul>
-        </Section>
+                  {toolLabel(name)}
+                </li>
+              ))}
+              {inUse.length === 0 && <li className="muted">This run used no tools.</li>}
+            </ul>
+          </Section>
+
+          {shown.tables.length > 0 && (
+            <Section id="office.tables" title="Tables">
+              <ul className="list">
+                {shown.tables.map((table) => (
+                  <li
+                    key={table.id}
+                    className={`row clickable${selection?.kind === "table" && selection.tableId === table.id ? " selected" : ""}`}
+                    onClick={() => select({ kind: "table", tableId: table.id })}
+                  >
+                    {table.name || table.id}
+                    <span className="tag">{table.mode === "pile" ? "pile" : "shared"}</span>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
+        </>
       )}
 
       {!building && (

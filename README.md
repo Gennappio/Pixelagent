@@ -42,8 +42,21 @@ Two more workflows are in the list, also with no API keys:
 ## Building a workflow
 
 A workflow is an office: agents, tables, and what each agent does, said one sentence at
-a time. Add agents and tables in the Office panel (`+`), then select an agent. An agent
-is one task with three slots, and under *What it does* each slot takes its sentences:
+a time. It is built in the room itself, with no graph on screen:
+
+- **Click the floor** to put a character, a table or a pile there.
+- **Click a character** to open its menu, where it stands. An agent is one task with
+  three slots, and each slot has a button for everything that can be said in it.
+- **Say the verb, then pick its target in the room.** The office dims, and only what
+  the verb accepts stays lit: characters for *hands to*, piles for *takes from*,
+  stations for *can use*. A click finishes the sentence; `Esc`, or a click on the floor,
+  gives it up. A tool nobody has yet has no station to click, so it is listed at the top.
+- **Drag anything** to move it. That changes where it stands and nothing else: dragging
+  never connects. Where things stand is saved with the workflow.
+- **Configure**, in a character's menu, opens the form for everything else: name, role,
+  prompt, who decides, what a scripted agent says and writes.
+
+The three slots, and what can be said in each:
 
 | Slot | Sentence | What happens |
 |---|---|---|
@@ -59,7 +72,8 @@ is one task with three slots, and under *What it does* each slot takes its sente
 
 What others hand to an agent is listed, greyed, among what arrives for it, and is changed
 on the sender. Handing over and writing happen *always* or *if it chooses*. Only a tool
-with a single text argument can be consulted first; the others can only be used.
+with a single text argument can be consulted first; the others can only be used. A table
+and a tool's station have menus of their own, which say who uses them.
 
 A hand-off is something said plus at most one sheet. What is said is the instruction,
 and lives in the event; the sheet is the context, has an id and versions, and is the
@@ -84,16 +98,17 @@ panels you leave open are remembered.
 
 | Key | Panel | | Key | Playback |
 |---|---|---|---|---|
-| `O` | Office: workflow, agents, tools, runs | | `Space` | Play or pause |
+| `O` | Office: the workflow file and its runs | | `Space` | Play or pause |
 | `I` | Inspector (opens when you click something) | | `←` `→` | Previous / next event |
 | `L` | Log of the run on screen | | `Home` `End` | Start / end |
 | `T` | Timeline | | `,` `.` | Slower / faster |
 | `B` | Playback bar | | `−` `+` | Zoom out / in, one step |
 | `G` | Graph of the workflow | | `Ctrl Enter` | Run the workflow |
 | `H` | Hide or bring back every panel | | `Ctrl S` | Save the workflow |
-| `Esc` | Close the graph, or clear the selection | | `?` | All shortcuts |
+| `Esc` | Give up a pick, close the graph or a menu | | `?` | All shortcuts |
 
-In the world: click to inspect, click the floor to deselect. Pinch, or hold Ctrl or ⌘
+In the world, with a run on screen: click to inspect, click the floor to deselect. While
+building, a click opens the menu of what was clicked. Either way: pinch, or hold Ctrl or ⌘
 and turn the wheel, to zoom around the pointer. The wheel alone, two fingers on a
 trackpad, or dragging the floor pans. Double-click frames the room again. The two
 buttons at the end of the playback bar zoom too, and the number between them frames the
@@ -139,7 +154,9 @@ apps/web/src/
   hud/         the shell: collapsible panels, top bar, shortcuts, graph overlay
   debugger/    ReplayController, timeline, playback bar, transcript
   inspector/   agent / event / tool inspectors
-  build/       pure edits of a workflow: agents, tables, sentences, scripts
+  build/       building in the room: pure edits of a workflow (agents, tables, sentences,
+               scripts, where things stand), what a pending sentence lights, and the menus
+               laid over the world
   graph/       the workflow as a graph, derived from its relations (XYFlow, read-only)
   state/       stores, and the actions the bar, panels and shortcuts share
 ```
@@ -199,10 +216,10 @@ agents may work at the same time, default `4`).
 
 ## Status
 
-Phases 1–12 of AGENTS.md §38 are in place: event protocol, pixel world, event →
+Phases 1–13 of AGENTS.md §38 are in place: event protocol, pixel world, event →
 animation, replay, the world-first shell, documents, animation lanes, workflows as
-relations run by the office runtime, the three slots with the spoken message, and the
-camera that zooms in whole steps.
+relations run by the office runtime, the three slots with the spoken message, the camera
+that zooms in whole steps, and building on the characters.
 
 AGENTS.md revision 2 (2026-10-05) set the direction: the pixel world is the primary
 GUI and becomes the editor, the graph a derived read-only view, and the workflow a list
@@ -210,9 +227,9 @@ of relations ("Anna sends_to Luca") over agents, tools, documents, tables and ro
 Revision 3 (2026-10-06), after the first hands-on use, fixes what a character is (one
 task with three slots: what arrives, what it consults, where its sheet goes), splits a
 hand-off into a spoken message and a sheet, and moves building onto the characters
-themselves, with a game's interface and a camera that zooms. The model (Phase 11) and
-the camera (Phase 12) are built. Next up is Phase 13 (building on the characters: a menu
-on each character, targets picked in the world), then the game interface; see AGENTS.md
-§38 for the plan. Workflows saved before relations existed, and
+themselves, with a game's interface and a camera that zooms. The model (Phase 11), the
+camera (Phase 12) and building on the characters (Phase 13) are built. Next up is Phase
+14, the game interface: an icon bar, windows closed by default, pixel-art chrome; see
+AGENTS.md §38 for the plan. Workflows saved before relations existed, and
 runs exported before hand-offs had words, still open: they are read as they are, and a
 file is rewritten only when saved.

@@ -63,4 +63,55 @@ describe("ui store", () => {
     store.getState().toggleAll();
     expect(store.getState().panels).toEqual(before);
   });
+
+  it("opens the build menu on a thing without opening the inspector, and marks the thing as selected", () => {
+    const store = createUiStore(null);
+    store.getState().openMenu({ kind: "agent", agentId: "luca" });
+    expect(store.getState().menu).toEqual({ kind: "agent", agentId: "luca" });
+    expect(store.getState().selection).toEqual({ kind: "agent", agentId: "luca" });
+    expect(store.getState().panels.inspector).toBe(false);
+    store.getState().openMenu({ kind: "station", tool: "web_search" });
+    expect(store.getState().selection).toEqual({ kind: "tool", tool: "web_search" });
+    store.getState().openMenu({ kind: "table", tableId: "board" });
+    expect(store.getState().selection).toEqual({ kind: "table", tableId: "board" });
+    // A spot on the floor is nothing to select.
+    store.getState().openMenu({ kind: "floor", at: { x: 10, y: 200 } });
+    expect(store.getState().selection).toBeNull();
+    expect(store.getState().panels.inspector).toBe(false);
+  });
+
+  it("keeps the menu behind a sentence that waits for its object, and shows it again afterwards", () => {
+    const store = createUiStore(null);
+    store.getState().openMenu({ kind: "agent", agentId: "anna" });
+    store.getState().startPicking({ subject: "anna", verb: "sends_to" });
+    expect(store.getState().pending).toEqual({ subject: "anna", verb: "sends_to" });
+    expect(store.getState().menu).toEqual({ kind: "agent", agentId: "anna" });
+    // Picked or given up, it ends the same way for the interface: back to the menu it was started from.
+    store.getState().stopPicking();
+    expect(store.getState().pending).toBeNull();
+    expect(store.getState().menu).toEqual({ kind: "agent", agentId: "anna" });
+    expect(store.getState().selection).toEqual({ kind: "agent", agentId: "anna" });
+  });
+
+  it("drops a pending sentence when the menu is closed, or another is opened", () => {
+    const store = createUiStore(null);
+    store.getState().openMenu({ kind: "agent", agentId: "anna" });
+    store.getState().startPicking({ subject: "anna", verb: "sends_to" });
+    store.getState().closeMenu();
+    expect([store.getState().menu, store.getState().pending]).toEqual([null, null]);
+
+    store.getState().openMenu({ kind: "agent", agentId: "anna" });
+    store.getState().startPicking({ subject: "anna", verb: "uses_tool", required: true });
+    store.getState().openMenu({ kind: "agent", agentId: "luca" });
+    expect(store.getState().pending).toBeNull();
+    expect(store.getState().menu).toEqual({ kind: "agent", agentId: "luca" });
+  });
+
+  it("changes nothing when there is nothing to close or to give up", () => {
+    const store = createUiStore(null);
+    const before = store.getState();
+    store.getState().closeMenu();
+    store.getState().stopPicking();
+    expect(store.getState()).toBe(before);
+  });
 });

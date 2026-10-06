@@ -26,7 +26,10 @@ function perform(action: ShortcutAction): void {
       return ui.setHelp(!ui.help);
     case "escape":
       if (ui.help) return ui.setHelp(false);
+      // Innermost first: a sentence waiting for its object, the graph over the world, the menu on a thing.
+      if (ui.pending) return ui.stopPicking();
       if (ui.panels.graph) return ui.setPanel("graph", false);
+      if (ui.menu) return ui.closeMenu();
       return ui.select(null);
     case "playPause":
       if (playing) return replay.pause();

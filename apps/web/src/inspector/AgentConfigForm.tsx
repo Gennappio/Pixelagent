@@ -5,7 +5,6 @@ import type { Agent, AgentScript, RouterRule } from "../protocol/workflow";
 import { useUiStore } from "../state/uiStore";
 import { useWorkflowStore } from "../state/workflowStore";
 import { SPRITES } from "../world/sprites";
-import { RelationEditor } from "./RelationEditor";
 
 // What can decide for an agent. Only what needs no API key exists until a real provider
 // is wired in (AGENTS.md §38, Phase 15).
@@ -148,7 +147,6 @@ function RouterRules({ agent, change }: { agent: Agent; change: (patch: Partial<
 }
 
 export function AgentConfigForm({ agent }: { agent: Agent }) {
-  const workflow = useWorkflowStore((state) => state.workflow);
   const edit = useWorkflowStore((state) => state.edit);
   const select = useUiStore((state) => state.select);
   const change = (patch: Partial<Omit<Agent, "id">>) => edit((workflow) => updateAgent(workflow, agent.id, patch));
@@ -165,7 +163,7 @@ export function AgentConfigForm({ agent }: { agent: Agent }) {
         <input value={agent.role} onChange={(event) => change({ role: event.target.value })} />
       </label>
 
-      <RelationEditor workflow={workflow} agent={agent} editable />
+      <p className="muted">What {agent.name} does is said on the character: click it in the office.</p>
 
       <label>
         Who decides

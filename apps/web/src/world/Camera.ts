@@ -206,13 +206,17 @@ export class WorldCamera {
   /** The scale of the pinch in progress when it was last looked at (Safari). */
   private pinch = 1;
   private reported: CameraView | null = null;
+  private framingReported = false;
 
   constructor(
     private app: Application,
     private scene: Container,
     private world: Size,
-    private onFloorClick: () => void,
+    /** A click on empty floor, or beside the room, in world coordinates. */
+    private onFloorClick: (at: Point) => void,
     private onChange: (view: CameraView) => void = () => {},
+    /** Where the room is on screen, every time that changes: what is laid over the canvas follows it. */
+    private onFraming: (framing: Framing) => void = () => {},
   ) {
     const stage = app.stage;
     stage.eventMode = "static";
@@ -237,8 +241,10 @@ export class WorldCamera {
       this.goal = null; // the hand has it now: a glide under way would pull against it
       this.apply(this.inView({ scale: scene.scale.x, x: event.global.x - drag.offsetX, y: event.global.y - drag.offsetY }));
     });
-    stage.on("pointerup", () => {
-      if (this.drag && !this.drag.moved) this.onFloorClick();
+    stage.on("pointerup", (event: FederatedPointerEvent) => {
+      if (this.drag && !this.drag.moved) {
+        this.onFloorClick({ x: (event.global.x - scene.x) / scene.scale.x, y: (event.global.y - scene.y) / scene.scale.y });
+      }
       this.drag = null;
     });
     stage.on("pointerupoutside", () => (this.drag = null));
@@ -342,8 +348,13 @@ export class WorldCamera {
   }
 
   private apply({ scale, x, y }: Framing): void {
+    const moved = scale !== this.scene.scale.x || x !== this.scene.x || y !== this.scene.y;
     this.scene.scale.set(scale);
     this.scene.position.set(x, y);
+    if (moved || !this.framingReported) {
+      this.framingReported = true;
+      this.onFraming({ scale, x, y });
+    }
   }
 
   private glide(elapsedMs: number): void {

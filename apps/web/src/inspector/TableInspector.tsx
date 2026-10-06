@@ -57,7 +57,7 @@ export function TableInspector({ workflow, table, editable }: Props) {
 
       <h3>Who uses it</h3>
       {users.length === 0 ? (
-        <p className="muted">{editable ? "Nobody yet. Select an agent and say that it reads, writes on or takes from it." : "Nobody."}</p>
+        <p className="muted">{editable ? "Nobody yet. Click a character and say that it reads, writes on or takes from it." : "Nobody."}</p>
       ) : (
         <ul className="list">
           {users.map((relation) => (

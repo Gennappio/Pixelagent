@@ -30,6 +30,8 @@ export interface Shortcut {
   mod?: boolean;
   /** Fires again while the key is held down. */
   repeat?: boolean;
+  /** Works even while typing in a field. Only for a key that types nothing: Esc gets out of whatever is open. */
+  whileTyping?: boolean;
   label: string;
   description: string;
   action: ShortcutAction;
@@ -38,14 +40,14 @@ export interface Shortcut {
 const panel = (id: PanelId): ShortcutAction => ({ type: "togglePanel", panel: id });
 
 export const SHORTCUTS: Shortcut[] = [
-  { group: "Panels", keys: ["o"], label: "O", description: "Office: workflow, agents, tools, runs", action: panel("office") },
+  { group: "Panels", keys: ["o"], label: "O", description: "Office: the workflow file and its runs", action: panel("office") },
   { group: "Panels", keys: ["i"], label: "I", description: "Inspector", action: panel("inspector") },
   { group: "Panels", keys: ["l"], label: "L", description: "Log of the run on screen", action: panel("log") },
   { group: "Panels", keys: ["t"], label: "T", description: "Timeline", action: panel("timeline") },
   { group: "Panels", keys: ["b"], label: "B", description: "Playback bar", action: panel("playback") },
   { group: "Panels", keys: ["g"], label: "G", description: "Graph of the workflow", action: panel("graph") },
   { group: "Panels", keys: ["h"], label: "H", description: "Hide or bring back every panel", action: { type: "toggleAll" } },
-  { group: "Panels", keys: ["Escape"], label: "Esc", description: "Close the graph, or clear the selection", action: { type: "escape" } },
+  { group: "Panels", keys: ["Escape"], whileTyping: true, label: "Esc", description: "Cancel a pick, close the graph or a menu, clear the selection", action: { type: "escape" } },
   { group: "Panels", keys: ["?"], label: "?", description: "This list", action: { type: "help" } },
 
   { group: "Playback", keys: [" "], label: "Space", description: "Play or pause", action: { type: "playPause" } },
@@ -86,7 +88,7 @@ export function shortcutFor(input: KeyInput): ShortcutAction | null {
   if (!match) return null;
   if (input.repeat && !match.repeat) return null;
   if (!match.mod) {
-    if (input.target === "editable") return null;
+    if (input.target === "editable" && !match.whileTyping) return null;
     // Space on a focused button presses that button; do not also act on it globally.
     if (input.target === "button" && key === " ") return null;
   }

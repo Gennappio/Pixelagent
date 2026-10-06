@@ -3,12 +3,15 @@ import {
   DEFAULT_ROOM_ID,
   SCHEMA_VERSION,
   type Agent,
+  type Position,
   type Relation,
   type ToolDescription,
   type Verb,
   type Workflow,
   type WorkflowTable,
 } from "../protocol/workflow";
+import { agentKey, clampToRoom, tableKey, type Placed } from "../world/layout";
+import { pinLayout } from "./dragMove";
 
 // Pure edits of the workflow document: the only way build mode changes a workflow.
 // Each returns a new workflow, or the same one when there is nothing to change.
@@ -32,9 +35,35 @@ export function emptyWorkflow(): Workflow {
   };
 }
 
+/**
+ * The workflow with one more thing standing at `at`. Everything already there is first
+ * written down where it stands, so that making room for a newcomer moves nobody.
+ */
+function standing(workflow: Workflow, kind: Placed, key: string, at: Position | undefined, added: Partial<Workflow>): Workflow {
+  if (!at) return { ...workflow, ...added };
+  const pinned = pinLayout(workflow);
+  return { ...pinned, ...added, layout: { ...pinned.layout, positions: { ...pinned.layout.positions, [key]: clampToRoom(kind, at) } } };
+}
+
+function without(positions: Record<string, Position>, key: string): Record<string, Position> {
+  if (!(key in positions)) return positions;
+  const { [key]: _gone, ...rest } = positions;
+  return rest;
+}
+
 // -- agents
 
-export function addAgent(workflow: Workflow): { workflow: Workflow; agent: Agent } {
+/** The people a new character can look like, in the order they are handed out. The robot is kept for whoever follows a rule. */
+const PEOPLE = ["agent_male_01", "agent_female_01", "agent_male_02", "agent_female_02"];
+
+/** A look for a newcomer: the one fewest in the office have, so that characters can be told apart at a glance. */
+function nextSprite(workflow: Workflow): string {
+  const worn = (sprite: string) => workflow.agents.filter((agent) => agent.appearance.sprite === sprite).length;
+  return PEOPLE.reduce((best, sprite) => (worn(sprite) < worn(best) ? sprite : best));
+}
+
+/** Adds a character: at `at` (world coordinates) when it is put down by hand, else wherever there is room. */
+export function addAgent(workflow: Workflow, at?: Position): { workflow: Workflow; agent: Agent } {
   const agent: Agent = {
     id: uid("agent"),
     name: `Agent ${workflow.agents.length + 1}`,
@@ -43,9 +72,9 @@ export function addAgent(workflow: Workflow): { workflow: Workflow; agent: Agent
     instances: 1,
     model: { provider: "fake", name: "scripted-v1" },
     systemPrompt: "",
-    appearance: { sprite: "agent_male_01" },
+    appearance: { sprite: nextSprite(workflow) },
   };
-  return { workflow: { ...workflow, agents: [...workflow.agents, agent] }, agent };
+  return { workflow: standing(workflow, "agent", agentKey(agent.id), at, { agents: [...workflow.agents, agent] }), agent };
 }
 
 export function updateAgent(workflow: Workflow, agentId: string, patch: Partial<Omit<Agent, "id">>): Workflow {
@@ -64,12 +93,14 @@ export function removeAgent(workflow: Workflow, agentId: string): Workflow {
     relations: workflow.relations.filter(
       (relation) => relation.subject !== agentId && !(verbInfo(relation.verb).objectKind === "agent" && relation.object === agentId),
     ),
+    layout: { ...workflow.layout, positions: without(workflow.layout.positions, agentKey(agentId)) },
   };
 }
 
 // -- tables
 
-export function addTable(workflow: Workflow, mode: WorkflowTable["mode"] = "shared"): { workflow: Workflow; table: WorkflowTable } {
+/** Adds a table or a pile: at `at` (world coordinates) when it is put down by hand, else wherever there is room. */
+export function addTable(workflow: Workflow, mode: WorkflowTable["mode"] = "shared", at?: Position): { workflow: Workflow; table: WorkflowTable } {
   const table: WorkflowTable = {
     id: uid("table"),
     name: mode === "pile" ? `Pile ${workflow.tables.length + 1}` : `Table ${workflow.tables.length + 1}`,
@@ -77,7 +108,7 @@ export function addTable(workflow: Workflow, mode: WorkflowTable["mode"] = "shar
     scope: "room",
     roomId: workflow.rooms[0]?.id ?? DEFAULT_ROOM_ID,
   };
-  return { workflow: { ...workflow, tables: [...workflow.tables, table] }, table };
+  return { workflow: standing(workflow, "table", tableKey(table.id), at, { tables: [...workflow.tables, table] }), table };
 }
 
 /** A relation with a table that the table's mode allows: a pile is taken from, a shared table is read. */
@@ -107,6 +138,7 @@ export function removeTable(workflow: Workflow, tableId: string): Workflow {
     ...workflow,
     tables: workflow.tables.filter((table) => table.id !== tableId),
     relations: workflow.relations.filter((relation) => !(verbInfo(relation.verb).objectKind === "table" && relation.object === tableId)),
+    layout: { ...workflow.layout, positions: without(workflow.layout.positions, tableKey(tableId)) },
   };
 }
 
