@@ -1,0 +1,357 @@
+/* The chrome of the game: palette, type, frames and controls, to the pixel.
+
+   Rules (AGENTS.md §29): windows are pixel-art frames in the palette of the world, flat.
+   No blur, no rounded corners, no drop shadows anywhere: a test reads these stylesheets
+   and fails if one comes back. Type is a pixel font drawn at a whole multiple of the size
+   it was made for. Lines are two screen pixels thick, the pixel of an icon at its usual
+   size, so frames, icons and controls sit on one grid. */
+
+:root {
+  /* The colours of the world (world/PixelWorld.ts and the sprites): the interface is made of the same. */
+  --ink: #1a1c2c; /* outlines, in the room and around every window */
+  --void: #14161f; /* behind the room */
+  --wall: #262b44; /* the body of a window */
+  --wall-dark: #1d2136; /* wells: fields, lists, the track of a slider */
+  --floor: #3b4263; /* what is raised: buttons, title bars */
+  --floor-light: #414a6e;
+  --edge: #55608c; /* the light line of a frame, and of a raised thing */
+  --text: #dfe6f5;
+  --muted: #9aa4bf;
+  --accent: #ffd166;
+  --accent-light: #ffe29a;
+  --accent-dark: #c9962e;
+  --live: #ff5d5d;
+  --live-dark: #b93a3a;
+  --ok: #8be28b;
+  --blueprint: #7fb2ff;
+  --wood: #8a5a3c;
+  --paper: #f4f1e8;
+
+  /* The names the rest of the stylesheet has always used. */
+  --bg: var(--void);
+  --panel: var(--wall);
+  --panel-2: var(--floor);
+  --border: #343b5e;
+
+  /* Type. DotGothic16 is made for 16 pixels and Silkscreen for 8: only whole multiples of those. */
+  --font-body: "DotGothic16", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-title: "Silkscreen", "DotGothic16", ui-monospace, monospace;
+
+  /* The nine-slice frame of a window: a line of ink, then a line that is light on top and
+     on the left and dark below and on the right. Twelve pixels square, four to a slice. */
+  --frame: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' shape-rendering='crispEdges'><rect width='12' height='12' fill='%231a1c2c'/><rect x='2' y='2' width='8' height='8' fill='%231d2136'/><rect x='2' y='2' width='8' height='2' fill='%2355608c'/><rect x='2' y='2' width='2' height='6' fill='%2355608c'/><rect x='4' y='4' width='4' height='4' fill='%23262b44'/></svg>");
+  /* The same frame in the accent colour, for what asks to be answered. */
+  --frame-lit: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' shape-rendering='crispEdges'><rect width='12' height='12' fill='%231a1c2c'/><rect x='2' y='2' width='8' height='8' fill='%23c9962e'/><rect x='2' y='2' width='8' height='2' fill='%23ffd166'/><rect x='2' y='2' width='2' height='6' fill='%23ffd166'/><rect x='4' y='4' width='4' height='4' fill='%23262b44'/></svg>");
+  /* The arrow of a drop-down. */
+  --chevron: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='8' shape-rendering='crispEdges' fill='%23dfe6f5'><rect x='1' y='2' width='6' height='1'/><rect x='2' y='3' width='4' height='1'/><rect x='3' y='4' width='2' height='1'/></svg>");
+
+  font: 400 16px/20px var(--font-body);
+  /* A pixel font is its pixels: no smoothing, no hinting tricks, no invented weights. */
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+  font-smooth: never;
+  font-synthesis: none;
+  text-rendering: optimizeSpeed;
+  color: var(--text);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Neither font has a bold: what would be bold is said with colour instead. */
+strong,
+b,
+h1,
+h2,
+h3,
+h4,
+th {
+  font-weight: 400;
+}
+
+strong {
+  color: #fff;
+}
+
+/* -- frames */
+
+.window,
+.frame {
+  border: 4px solid var(--ink);
+  border-image: var(--frame) 4 / 4px stretch;
+  background: var(--wall);
+}
+
+.frame-lit {
+  border: 4px solid var(--accent);
+  border-image: var(--frame-lit) 4 / 4px stretch;
+  background: var(--wall);
+}
+
+.window {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-width: calc(100vw - 2 * var(--hud-gap));
+}
+
+.window-title {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 2px 8px;
+  background: var(--floor);
+  border-bottom: 2px solid var(--ink);
+  font: 400 16px/20px var(--font-title);
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.window-title > span:first-child,
+.window-title > strong:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--accent);
+}
+
+.window-title small {
+  font: 400 16px/20px var(--font-body);
+  color: var(--muted);
+}
+
+.window-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* -- controls */
+
+button,
+select,
+input,
+textarea {
+  font: inherit;
+  color: var(--text);
+  border: 2px solid var(--ink);
+  padding: 2px 8px;
+}
+
+/* A raised thing: a light line on top, a dark one below. Pressed, the other way round. */
+button {
+  cursor: pointer;
+  background: linear-gradient(var(--edge) 0 2px, var(--floor) 2px calc(100% - 2px), var(--wall-dark) calc(100% - 2px));
+}
+
+button:hover:not(:disabled) {
+  color: #fff;
+  background: linear-gradient(var(--edge) 0 2px, var(--floor-light) 2px calc(100% - 2px), var(--wall-dark) calc(100% - 2px));
+}
+
+button:active:not(:disabled),
+button.active {
+  background: linear-gradient(var(--wall-dark) 0 2px, var(--floor) 2px calc(100% - 2px), var(--edge) calc(100% - 2px));
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+button:disabled {
+  color: var(--edge);
+  cursor: default;
+}
+
+button.primary {
+  color: var(--ink);
+  background: linear-gradient(var(--accent-light) 0 2px, var(--accent) 2px calc(100% - 2px), var(--accent-dark) calc(100% - 2px));
+}
+
+button.primary:hover:not(:disabled) {
+  color: var(--ink);
+  background: linear-gradient(#fff 0 2px, var(--accent-light) 2px calc(100% - 2px), var(--accent-dark) calc(100% - 2px));
+}
+
+button.primary:disabled {
+  color: var(--accent-dark);
+  background: var(--floor);
+}
+
+button.active {
+  color: var(--accent);
+}
+
+button.danger {
+  color: var(--live);
+}
+
+button.danger:hover:not(:disabled),
+.topbar button.danger {
+  color: #fff;
+  background: linear-gradient(#ff9a9a 0 2px, var(--live) 2px calc(100% - 2px), var(--live-dark) calc(100% - 2px));
+}
+
+/* A button that is only its icon: nothing raised about it until the pointer is on it. */
+button.icon {
+  padding: 2px 4px;
+  border-color: transparent;
+  background: none;
+  color: var(--muted);
+  line-height: 0;
+}
+
+button.icon:hover:not(:disabled) {
+  color: #fff;
+  background: var(--floor-light);
+  border-color: var(--ink);
+}
+
+button.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--blueprint);
+  text-decoration: underline;
+}
+
+button.link:hover:not(:disabled) {
+  background: none;
+  color: #fff;
+}
+
+/* A well: where something is typed or chosen. */
+input,
+textarea,
+select {
+  width: 100%;
+  background: var(--wall-dark);
+}
+
+textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+select {
+  appearance: none;
+  padding-right: 24px;
+  background: var(--wall-dark) var(--chevron) right 6px center / 16px 16px no-repeat;
+  image-rendering: pixelated;
+  text-overflow: ellipsis;
+}
+
+::placeholder {
+  color: var(--edge);
+  opacity: 1;
+}
+
+/* The playhead: a track cut into the bar, and a block to drag along it. */
+input[type="range"] {
+  appearance: none;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 8px;
+  border: 2px solid var(--ink);
+  background: var(--wall-dark);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 8px;
+  height: 20px;
+  margin-top: -8px;
+  border: 2px solid var(--ink);
+  background: var(--accent);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border: 2px solid var(--ink);
+  background: var(--wall-dark);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 4px;
+  height: 16px;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  background: var(--accent);
+}
+
+input[type="range"]:disabled::-webkit-slider-thumb {
+  background: var(--floor);
+}
+
+/* A key: a small dark cap with its letter, in the font made for eight pixels. */
+kbd {
+  display: inline-block;
+  min-width: 12px;
+  padding: 2px 2px 2px 3px;
+  background: var(--ink);
+  color: var(--muted);
+  font: 400 8px/8px var(--font-title);
+  text-align: center;
+  text-transform: uppercase;
+  vertical-align: 2px;
+}
+
+button.primary kbd,
+.bar-icon.lit kbd {
+  background: var(--accent-dark);
+  color: var(--ink);
+}
+
+.pixel-icon {
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+}
+
+/* Scrolling: a square thumb in a well, like everything else. */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: var(--wall-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--floor);
+  border: 2px solid var(--ink);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--edge);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+small {
+  color: var(--muted);
+  font-size: inherit;
+}
+
+code {
+  font-family: inherit;
+  color: var(--accent-light);
+}

@@ -4,12 +4,13 @@ import { PlaybackBar } from "./debugger/PlaybackBar";
 import { Timeline } from "./debugger/Timeline";
 import { Transcript } from "./debugger/TranscriptPanel";
 import { GraphOverlay } from "./hud/GraphOverlay";
+import { IconBar } from "./hud/IconBar";
 import { OfficePanel } from "./hud/OfficePanel";
-import { Panel } from "./hud/Panel";
 import { HUD, worldInsets } from "./hud/panels";
 import { ShortcutHelp } from "./hud/ShortcutHelp";
 import { TopBar } from "./hud/TopBar";
 import { useShortcuts } from "./hud/useShortcuts";
+import { Window } from "./hud/Window";
 import { Inspector } from "./inspector/Inspector";
 import { namesOf } from "./protocol/workflow";
 import { replay } from "./state/replayStore";
@@ -36,8 +37,9 @@ function useReplayClock(): void {
 }
 
 /**
- * The shell: the pixel world fills the screen and everything else floats over it as
- * collapsible panels. Build mode edits the workflow; run and replay only read events.
+ * The shell: the pixel world fills the screen. Everything else is a window that opens
+ * from its icon on the bar and closes again; only the bar and the playback strip are
+ * always there. Build mode edits the workflow; run and replay only read events.
  */
 export function App() {
   const { workflow, error: workflowError, init } = useWorkflowStore();
@@ -89,19 +91,19 @@ export function App() {
         {panels.graph && <GraphOverlay workflow={shown} executed={mode !== "build"} resetKey={run?.id ?? workflow.id} />}
 
         <div className="hud-column left">
-          <Panel id="office" title="Office" hotkey="O" className="office-panel">
+          <Window id="office" title="Office" hotkey="O" className="office-panel">
             <OfficePanel />
-          </Panel>
+          </Window>
           {run && (
-            <Panel id="log" title="Log" hotkey="L" className="log-panel">
+            <Window id="log" title="Log" hotkey="L" className="log-panel">
               <Transcript names={names} />
-            </Panel>
+            </Window>
           )}
         </div>
         <div className="hud-column right">
-          <Panel id="inspector" title="Inspector" hotkey="I" className="inspector-panel">
+          <Window id="inspector" title="Inspector" hotkey="I" className="inspector-panel">
             <Inspector names={names} />
-          </Panel>
+          </Window>
         </div>
 
         {help && <ShortcutHelp />}
@@ -113,7 +115,10 @@ export function App() {
             <Timeline />
           </div>
         )}
-        <PlaybackBar />
+        <div className="dock-row">
+          <IconBar />
+          <PlaybackBar />
+        </div>
       </footer>
     </div>
   );

@@ -1,7 +1,7 @@
 import { backToBuild, replayLatest, runWorkflow, stopRun } from "../state/actions";
 import { useRunStore } from "../state/runStore";
-import { useUiStore } from "../state/uiStore";
 import { useWorkflowStore } from "../state/workflowStore";
+import { PixelIcon } from "./PixelIcon";
 
 /** BUILD edits the workflow; RUN follows a live run; REPLAY shows a stored one. */
 function ModeSwitch() {
@@ -50,10 +50,6 @@ export function TopBar() {
   const dirty = useWorkflowStore((state) => state.dirty);
   const run = useRunStore((state) => state.run);
   const mode = useRunStore((state) => state.mode);
-  const graph = useUiStore((state) => state.panels.graph);
-  const help = useUiStore((state) => state.help);
-  const toggle = useUiStore((state) => state.toggle);
-  const setHelp = useUiStore((state) => state.setHelp);
 
   return (
     <header className="topbar">
@@ -61,28 +57,22 @@ export function TopBar() {
       <ModeSwitch />
       <span className="topbar-title" title={dirty ? "Unsaved changes" : undefined}>
         {(run?.workflow ?? workflow).name}
-        {dirty && mode === "build" && <span className="unsaved"> ●</span>}
+        {dirty && mode === "build" && <span className="unsaved" aria-label="unsaved changes" />}
       </span>
       <span className="spacer" />
       {run && (
-        <span className="muted">
-          {run.id} · <span className={`status ${run.status}`}>{run.status}</span>
+        <span className="run-id">
+          {run.id} <span className={`status ${run.status}`}>{run.status}</span>
         </span>
       )}
-      <button className={graph ? "active" : ""} aria-pressed={graph} title="Graph of the workflow (G)" onClick={() => toggle("graph")}>
-        Graph <kbd>G</kbd>
-      </button>
-      <button className={help ? "active" : ""} aria-pressed={help} title="Keyboard shortcuts (?)" onClick={() => setHelp(!help)}>
-        ?
-      </button>
       {mode === "run" ? (
         // The run is the server's: stopping it ends it there, with an event that says so.
         <button className="danger run" title="Stop this run" onClick={() => void stopRun()}>
-          ■ STOP
+          <span className="stop-square" /> STOP
         </button>
       ) : (
         <button className="primary run" title="Run the workflow (Ctrl Enter)" onClick={() => void runWorkflow()}>
-          ▶ RUN
+          <PixelIcon name="play" /> RUN
         </button>
       )}
     </header>

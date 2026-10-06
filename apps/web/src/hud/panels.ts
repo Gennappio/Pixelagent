@@ -1,13 +1,17 @@
 import type { Insets } from "../world/Camera";
 
-// Which parts of the HUD are open. Pure, so it is testable without a browser.
+// Which windows are open. Pure, so it is testable without a browser.
 
-/** Every collapsible part of the interface and whether it starts open. */
+/**
+ * Every part of the interface that opens and closes, and whether it starts open. Nothing
+ * does but the playback strip: the world fills the screen, and a window is opened from
+ * its icon on the bar when it is wanted. What a browser has open is remembered.
+ */
 export const PANEL_DEFAULTS = {
-  office: true,
+  office: false,
   /** Opens by itself when something is selected. */
   inspector: false,
-  log: true,
+  log: false,
   timeline: false,
   /** false = collapsed to a thin progress strip. */
   playback: true,
@@ -92,7 +96,7 @@ export function savePanels(storage: PanelStorage | null, panels: PanelState): vo
 
 // Geometry shared by the stylesheet (through CSS variables) and the world camera.
 
-export const HUD = { gap: 8, officeWidth: 250, inspectorWidth: 340 } as const;
+export const HUD = { gap: 8, officeWidth: 256, inspectorWidth: 352 } as const;
 
 /** The viewport edges the open side panels cover, so the camera can frame the room beside them. */
 export function worldInsets(panels: Pick<PanelState, "office" | "inspector">): Insets {

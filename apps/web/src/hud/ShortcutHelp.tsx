@@ -1,7 +1,8 @@
 import { useUiStore } from "../state/uiStore";
+import { PixelIcon } from "./PixelIcon";
 import { SHORTCUTS, type ShortcutGroup } from "./shortcuts";
 
-const GROUPS: ShortcutGroup[] = ["Panels", "Playback", "Camera", "Workflow"];
+const GROUPS: ShortcutGroup[] = ["Windows", "Playback", "Camera", "Workflow"];
 
 const MOUSE = [
   ["Click", "Inspect a character, a sheet, a tool, a speech bubble"],
@@ -16,15 +17,15 @@ const MOUSE = [
 export function ShortcutHelp() {
   const setHelp = useUiStore((state) => state.setHelp);
   return (
-    <aside className="help" aria-label="Keyboard shortcuts">
-      <header className="panel-header">
+    <aside className="window help" aria-label="Keyboard shortcuts">
+      <header className="window-title">
         <span>Shortcuts</span>
         <kbd>?</kbd>
-        <button className="icon" title="Close (Esc)" aria-label="Close" onClick={() => setHelp(false)}>
-          ✕
+        <button type="button" className="icon" title="Close (Esc)" aria-label="Close" onClick={() => setHelp(false)}>
+          <PixelIcon name="close" />
         </button>
       </header>
-      <div className="help-body">
+      <div className="window-body help-body">
         {GROUPS.map((group) => (
           <section key={group}>
             <h3>{group}</h3>

@@ -12,7 +12,7 @@ import { useRunStore } from "../state/runStore";
 import { useUiStore } from "../state/uiStore";
 import { useWorkflowStore } from "../state/workflowStore";
 import { cssColor, spriteFor } from "../world/sprites";
-import { Section } from "./Panel";
+import { Section } from "./Window";
 
 function download(filename: string, data: unknown): void {
   const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
@@ -189,7 +189,7 @@ export function OfficePanel() {
               Task
               <div className="readonly">{run.input || "—"}</div>
             </label>
-            <button onClick={backToBuild}>◂ Back to BUILD to edit</button>
+            <button onClick={backToBuild}>Back to BUILD to edit</button>
           </>
         )}
       </Section>

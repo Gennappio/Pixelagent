@@ -93,18 +93,20 @@ as it is to whoever its rules name, a **splitter** writes one sheet per line on 
 
 ## The screen
 
-The world fills the window. Everything else floats over it and collapses, and the
-panels you leave open are remembered.
+The world fills the window. Everything else is a window of its own that opens from the
+icon bar at the bottom-left, or from the key printed under its icon, and closes again.
+Nothing is open at first but the bar and the playback controls; what you leave open is
+remembered.
 
-| Key | Panel | | Key | Playback |
+| Key | Window | | Key | Playback |
 |---|---|---|---|---|
 | `O` | Office: the workflow file and its runs | | `Space` | Play or pause |
 | `I` | Inspector (opens when you click something) | | `←` `→` | Previous / next event |
 | `L` | Log of the run on screen | | `Home` `End` | Start / end |
 | `T` | Timeline | | `,` `.` | Slower / faster |
-| `B` | Playback bar | | `−` `+` | Zoom out / in, one step |
+| `B` | Playback controls, or only the strip | | `−` `+` | Zoom out / in, one step |
 | `G` | Graph of the workflow | | `Ctrl Enter` | Run the workflow |
-| `H` | Hide or bring back every panel | | `Ctrl S` | Save the workflow |
+| `H` | Hide every window, or bring them back | | `Ctrl S` | Save the workflow |
 | `Esc` | Give up a pick, close the graph or a menu | | `?` | All shortcuts |
 
 In the world, with a run on screen: click to inspect, click the floor to deselect. While
@@ -114,9 +116,14 @@ trackpad, or dragging the floor pans. Double-click frames the room again. The tw
 buttons at the end of the playback bar zoom too, and the number between them frames the
 room again.
 
+The interface is drawn like the office: pixel-art frames in the colours of the room, two
+pixel fonts (DotGothic16 for text, Silkscreen for titles and keys, both bundled), icons
+made of the same pixels in the windows and in the world. Over a character's head a small
+icon says whether it is thinking, waiting or working, or that it failed.
+
 The camera rests only at whole multiples of the pixel size, from 1× to 8×, plus one half
 for an overview: at any other scale pixel art shimmers. It starts at the largest step at
-which the room fits beside the open panels, and goes back to it when panels open or
+which the room fits beside the open windows, and goes back to it when windows open or
 close, unless you have zoomed or panned. However far you pan, a corner of the room stays
 in sight.
 
@@ -150,15 +157,17 @@ apps/web/src/
   protocol/    wire types (mirror of the server models), the verbs and their three slots,
                the document fold, and the one reader of hand-offs old and new
   animation/   VisualEventMapper (event → visual actions), lanes, AnimationScheduler
+  pixel/       every icon, as rows of pixels
   world/       PixiJS renderer, camera, world state, layout, placeholder sprites
-  hud/         the shell: collapsible panels, top bar, shortcuts, graph overlay
+  hud/         the shell: icon bar, windows, top bar, shortcuts, graph overlay
   debugger/    ReplayController, timeline, playback bar, transcript
   inspector/   agent / event / tool inspectors
   build/       building in the room: pure edits of a workflow (agents, tables, sentences,
                scripts, where things stand), what a pending sentence lights, and the menus
                laid over the world
   graph/       the workflow as a graph, derived from its relations (XYFlow, read-only)
-  state/       stores, and the actions the bar, panels and shortcuts share
+  state/       stores, and the actions the bar, windows and shortcuts share
+  pixel.css    the chrome: palette, type, frames, controls (styles.css is made of it)
 ```
 
 ## How the pieces hold together
@@ -183,7 +192,7 @@ apps/web/src/
   it. What is said at a hand-off is in the event too, and is not a document. In the
   world a sheet sits in the in-tray, in someone's hands, on a table or in the out-tray,
   and can be clicked like anything else; sheets an agent is done with are filed, out of
-  sight but listed under Sheets in the Office panel.
+  sight but listed under Sheets in the Office window.
 - **Old logs keep working.** A run saved before hand-offs had words of their own, when
   every hand-off was a sheet made for the occasion, opens and replays as it did:
   `tests/fixtures/revision2/` holds such logs, and both test suites fold and play them.
@@ -216,10 +225,10 @@ agents may work at the same time, default `4`).
 
 ## Status
 
-Phases 1–13 of AGENTS.md §38 are in place: event protocol, pixel world, event →
+Phases 1–14 of AGENTS.md §38 are in place: event protocol, pixel world, event →
 animation, replay, the world-first shell, documents, animation lanes, workflows as
 relations run by the office runtime, the three slots with the spoken message, the camera
-that zooms in whole steps, and building on the characters.
+that zooms in whole steps, building on the characters, and the game interface.
 
 AGENTS.md revision 2 (2026-10-05) set the direction: the pixel world is the primary
 GUI and becomes the editor, the graph a derived read-only view, and the workflow a list
@@ -227,9 +236,9 @@ of relations ("Anna sends_to Luca") over agents, tools, documents, tables and ro
 Revision 3 (2026-10-06), after the first hands-on use, fixes what a character is (one
 task with three slots: what arrives, what it consults, where its sheet goes), splits a
 hand-off into a spoken message and a sheet, and moves building onto the characters
-themselves, with a game's interface and a camera that zooms. The model (Phase 11), the
-camera (Phase 12) and building on the characters (Phase 13) are built. Next up is Phase
-14, the game interface: an icon bar, windows closed by default, pixel-art chrome; see
-AGENTS.md §38 for the plan. Workflows saved before relations existed, and
+themselves, with a game's interface and a camera that zooms. All of it is built: the
+model (Phase 11), the camera (Phase 12), building on the characters (Phase 13) and the
+game interface (Phase 14). Next up is Phase 15, the first real LLM agent; see AGENTS.md
+§38 for the plan. Workflows saved before relations existed, and
 runs exported before hand-offs had words, still open: they are read as they are, and a
 file is rewritten only when saved.

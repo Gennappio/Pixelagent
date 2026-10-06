@@ -13,8 +13,14 @@ function memoryStorage(initial: Record<string, string> = {}) {
 
 describe("ui store", () => {
   it("restores the panels the user left open", () => {
-    const storage = memoryStorage({ [STORAGE_KEY]: JSON.stringify({ office: false, timeline: true }) });
-    expect(createUiStore(storage).getState().panels).toEqual({ ...PANEL_DEFAULTS, office: false, timeline: true });
+    const storage = memoryStorage({ [STORAGE_KEY]: JSON.stringify({ office: true, timeline: true }) });
+    expect(createUiStore(storage).getState().panels).toEqual({ ...PANEL_DEFAULTS, office: true, timeline: true });
+  });
+
+  it("opens on the world alone: no window, only the playback strip", () => {
+    const { panels, help } = createUiStore(memoryStorage()).getState();
+    expect([panels.office, panels.inspector, panels.log, panels.timeline, panels.graph, help]).toEqual([false, false, false, false, false, false]);
+    expect(panels.playback).toBe(true);
   });
 
   it("works without any storage", () => {
@@ -28,8 +34,8 @@ describe("ui store", () => {
     const store = createUiStore(storage);
     store.getState().toggle("graph");
     expect(storage.stored().graph).toBe(true);
-    store.getState().setPanel("office", false);
-    expect(storage.stored().office).toBe(false);
+    store.getState().setPanel("office", true);
+    expect(storage.stored().office).toBe(true);
     store.getState().toggleAll();
     expect(storage.stored()).toMatchObject({ office: false, log: false, playback: false });
   });
@@ -57,9 +63,10 @@ describe("ui store", () => {
   it("hide all then hide all again returns to the same panels", () => {
     const store = createUiStore(null);
     store.getState().toggle("timeline");
+    store.getState().toggle("office");
     const before = store.getState().panels;
     store.getState().toggleAll();
-    expect(store.getState().panels.office).toBe(false);
+    expect([store.getState().panels.office, store.getState().panels.timeline, store.getState().panels.playback]).toEqual([false, false, false]);
     store.getState().toggleAll();
     expect(store.getState().panels).toEqual(before);
   });

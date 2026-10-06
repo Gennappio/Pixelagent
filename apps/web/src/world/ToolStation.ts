@@ -1,10 +1,15 @@
-import { Container, Graphics, Rectangle, Text } from "pixi.js";
+import { Container, Graphics, Rectangle } from "pixi.js";
+import { toolIcon } from "../pixel/bitmaps";
 import { toolLabel } from "../protocol/workflow";
+import { centred, drawIcon, pixelText } from "./pixel";
 import type { StationVisualState } from "./worldState";
 
 const INK = 0x1a1c2c;
 const DESK = 0x8a5a3c;
 const DESK_DARK = 0x6b4530;
+const TEXT = 0xdfe6f5;
+/** The sign over a station: the tool's icon on a plate, then its name. */
+const SIGN = { plate: 16, gap: 4, bottom: -40 };
 
 type Draw = (g: Graphics, active: boolean, frame: number) => void;
 
@@ -40,9 +45,11 @@ const DEVICES: Record<string, Draw> = {
   },
 };
 
+/** A tool with no machine of its own: a box with the icon any tool gets on its face. */
 const fallbackDevice: Draw = (g, active) => {
   desk(g);
   g.rect(-14, -28, 28, 24).fill(active ? 0xffd166 : 0x9a8a5a).stroke({ color: INK, width: 2 });
+  drawIcon(g, "tool", -12, -28, 2, INK);
 };
 
 /** Where a tool call is acted out. Purely decorative: the tool itself runs on the server. */
@@ -59,16 +66,14 @@ export class ToolStation extends Container {
     this.draw = DEVICES[tool] ?? fallbackDevice;
     this.glow.rect(-36, -38, 72, 72).stroke({ color: 0x7fe7ff, width: 2, alpha: 0.9 });
 
-    const label = new Text({
-      text: toolLabel(tool),
-      style: { fontFamily: "monospace", fontSize: 10, fill: 0xdfe6f5, stroke: { color: INK, width: 3, join: "round" } },
-      resolution: 3,
-    });
-    label.anchor.set(0.5, 1);
-    label.y = -40;
+    const label = pixelText(toolLabel(tool), { fill: TEXT, outlined: true });
+    const left = centred(SIGN.plate + SIGN.gap + label.width);
+    const plate = new Graphics().rect(left, SIGN.bottom - SIGN.plate, SIGN.plate, SIGN.plate).fill(INK);
+    drawIcon(plate, toolIcon(tool), left + 2, SIGN.bottom - SIGN.plate + 2, 1, TEXT);
+    label.position.set(left + SIGN.plate + SIGN.gap, SIGN.bottom - Math.round((SIGN.plate + label.height) / 2));
 
     this.outline.visible = false;
-    this.addChild(this.outline, this.glow, this.device, label);
+    this.addChild(this.outline, this.glow, this.device, plate, label);
     this.eventMode = "static";
     this.cursor = "pointer";
     this.hitArea = new Rectangle(-36, -52, 72, 86);

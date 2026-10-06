@@ -1,24 +1,5 @@
-:root {
-  --bg: #14161f;
-  --panel: #1c1f2e;
-  --panel-2: #252a3d;
-  --border: #323852;
-  --ink: #0d0f17;
-  --text: #dfe6f5;
-  --muted: #8c95b0;
-  --accent: #ffd166;
-  --live: #ff5d5d;
-  --ok: #8be28b;
-  --blueprint: #7fb2ff;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  font-size: 13px;
-  color: var(--text);
-  color-scheme: dark;
-}
-
-* {
-  box-sizing: border-box;
-}
+/* Layout and components. The chrome they are made of (palette, type, frames, controls)
+   is in pixel.css. Sizes are on a grid of 4 pixels, lines are 2 pixels thick. */
 
 html,
 body,
@@ -29,7 +10,7 @@ body,
   overflow: hidden;
 }
 
-/* The shell: a top bar, the stage (world plus floating panels) and a dock. */
+/* The shell: a top bar, the stage (the world, with windows laid on it) and the dock. */
 
 .app {
   height: 100%;
@@ -37,145 +18,23 @@ body,
   flex-direction: column;
 }
 
-button,
-select,
-input,
-textarea {
-  font: inherit;
-  color: var(--text);
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 4px 8px;
-}
-
-button {
-  cursor: pointer;
-}
-
-button:hover:not(:disabled) {
-  border-color: var(--muted);
-}
-
-button:focus-visible,
-select:focus-visible,
-input:focus-visible,
-textarea:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #1a1c2c;
-  font-weight: 700;
-}
-
-button.active {
-  background: var(--text);
-  border-color: var(--text);
-  color: var(--bg);
-}
-
-button.danger {
-  background: none;
-  border-color: var(--live);
-  color: var(--live);
-}
-
-button.danger:hover:not(:disabled) {
-  background: var(--live);
-  color: #fff;
-}
-
-.topbar button.danger {
-  background: var(--live);
-  color: #fff;
-  font-weight: 700;
-}
-
-button.icon {
-  padding: 0 6px;
-  line-height: 18px;
-  background: none;
-  border-color: transparent;
-  color: var(--muted);
-}
-
-button.icon:hover {
-  color: var(--text);
-}
-
-input,
-textarea,
-select {
-  width: 100%;
-}
-
-textarea {
-  resize: vertical;
-  font-family: inherit;
-}
-
-.muted {
-  color: var(--muted);
-}
-
-small {
-  color: var(--muted);
-  font-weight: 400;
-}
-
-code {
-  font-family: ui-monospace, monospace;
-}
-
-kbd {
-  display: inline-block;
-  min-width: 18px;
-  font: 600 11px/16px ui-sans-serif, system-ui, sans-serif;
-  letter-spacing: 0;
-  text-transform: none;
-  text-align: center;
-  padding: 0 4px;
-  border: 1px solid var(--muted);
-  border-bottom-width: 2px;
-  border-radius: 3px;
-  background: var(--bg);
-  color: var(--text);
-}
-
-button.active kbd,
-button.primary kbd {
-  background: transparent;
-  border-color: currentColor;
-  color: inherit;
-}
-
 /* top bar */
 
 .topbar {
   flex: none;
-  height: 44px;
+  height: 40px;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 12px;
-  background: var(--panel);
+  padding: 0 8px;
+  background: linear-gradient(var(--floor) 0 2px, var(--wall) 2px);
   border-bottom: 2px solid var(--ink);
   white-space: nowrap;
 }
 
 .topbar h1 {
   margin: 0;
-  font: 700 15px ui-monospace, monospace;
-  letter-spacing: 1px;
+  font: 400 16px/20px var(--font-title);
   color: var(--accent);
 }
 
@@ -184,7 +43,17 @@ button.primary kbd {
 }
 
 .topbar .run {
-  padding: 6px 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 16px;
+  font: 400 16px/20px var(--font-title);
+}
+
+.stop-square {
+  width: 8px;
+  height: 8px;
+  background: currentColor;
 }
 
 .topbar-title {
@@ -195,7 +64,15 @@ button.primary kbd {
 }
 
 .unsaved {
-  color: var(--accent);
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 8px;
+  background: var(--accent);
+}
+
+.run-id {
+  color: var(--muted);
 }
 
 .segmented {
@@ -203,55 +80,39 @@ button.primary kbd {
 }
 
 .segmented button {
-  border-radius: 0;
-  font: 700 12px ui-monospace, monospace;
-  letter-spacing: 1px;
-  padding: 5px 14px;
+  font: 400 16px/20px var(--font-title);
+  padding: 2px 12px;
 }
 
 .segmented button + button {
-  border-left: 0;
-}
-
-.segmented button:first-child {
-  border-radius: 4px 0 0 4px;
-}
-
-.segmented button:last-child {
-  border-radius: 0 4px 4px 0;
+  margin-left: -2px;
 }
 
 /* The mode that is on stays fully legible even though its button cannot be pressed again. */
-.segmented button.active {
-  opacity: 1;
-}
-
 .segmented button.active.build {
-  background: var(--blueprint);
-  border-color: var(--blueprint);
+  color: var(--ink);
+  background: linear-gradient(#b9d6ff 0 2px, var(--blueprint) 2px calc(100% - 2px), #4c7fcf calc(100% - 2px));
 }
 
 .segmented button.active.run {
-  background: var(--live);
-  border-color: var(--live);
   color: #fff;
+  background: linear-gradient(#ff9a9a 0 2px, var(--live) 2px calc(100% - 2px), var(--live-dark) calc(100% - 2px));
 }
 
 .segmented button.active.replay {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #1a1c2c;
+  color: var(--ink);
+  background: linear-gradient(var(--accent-light) 0 2px, var(--accent) 2px calc(100% - 2px), var(--accent-dark) calc(100% - 2px));
 }
 
 .error-banner {
   flex: none;
-  padding: 6px 12px;
+  padding: 4px 8px;
   background: #4a1f27;
   color: #ffd0d0;
-  border-bottom: 1px solid var(--live);
+  border-bottom: 2px solid var(--live);
 }
 
-/* stage: the world fills it, the HUD floats above */
+/* stage: the world fills it, windows are laid on it */
 
 .stage {
   flex: 1;
@@ -280,7 +141,7 @@ button.primary kbd {
   display: flex;
   flex-direction: column;
   gap: var(--hud-gap);
-  /* Only the panels themselves take clicks; the gaps let them through to the world. */
+  /* Only the windows themselves take clicks; the gaps let them through to the world. */
   pointer-events: none;
 }
 
@@ -294,97 +155,34 @@ button.primary kbd {
   align-items: flex-end;
 }
 
-.panel {
-  pointer-events: auto;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  max-width: calc(100vw - 2 * var(--hud-gap));
-  background: rgba(28, 31, 46, 0.96);
-  border: 2px solid var(--ink);
-  border-radius: 6px;
-  box-shadow:
-    inset 0 0 0 1px var(--border),
-    4px 4px 0 rgba(0, 0, 0, 0.35);
-}
-
-.panel-header {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 6px 5px 10px;
-  border-bottom: 1px solid var(--border);
-  font: 700 11px ui-monospace, monospace;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-
-.panel-header > span:first-child {
-  flex: 1;
-}
-
-.panel-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.panel-tab {
-  pointer-events: auto;
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 10px;
-  background: rgba(28, 31, 46, 0.96);
-  border: 2px solid var(--ink);
-  border-radius: 6px;
-  box-shadow:
-    inset 0 0 0 1px var(--border),
-    3px 3px 0 rgba(0, 0, 0, 0.35);
-  font: 700 11px ui-monospace, monospace;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.panel-tab:hover {
-  color: var(--accent);
-}
-
-.office-panel.panel {
-  flex: 1 1 auto;
+/* A window is as tall as what is in it, and scrolls when the stage is shorter than that. */
+.office-panel.window {
+  flex: 0 1 auto;
   width: var(--office-w);
 }
 
-.inspector-panel.panel {
-  flex: 1 1 auto;
+.inspector-panel.window {
+  flex: 0 1 auto;
   width: var(--inspector-w);
 }
 
-/* The log reads like a game's message feed: see-through, pinned to the bottom-left. */
-.log-panel {
-  margin-top: auto;
-}
-
-.log-panel.panel {
+/* The log reads like a game's message feed: pinned to the bottom-left, above the bar. */
+.log-panel.window {
   flex: 0 0 auto;
-  width: 430px;
-  height: 190px;
-  background: rgba(16, 18, 27, 0.84);
-  backdrop-filter: blur(3px);
+  margin-top: auto;
+  width: 448px;
+  height: 200px;
+  background: var(--wall-dark);
 }
 
-/* office panel */
+/* office window */
 
 .section {
-  padding: 8px 10px 10px;
-  border-bottom: 1px solid var(--border);
+  padding: 8px;
+  border-bottom: 2px solid var(--ink);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .section:last-child {
@@ -398,46 +196,36 @@ button.primary kbd {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 6px;
-  font: 700 11px ui-monospace, monospace;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+  gap: 8px;
+  font: inherit;
   color: var(--muted);
 }
 
 .section h3 button {
-  padding: 0 7px;
-  text-transform: none;
-  letter-spacing: 0;
+  padding: 0 8px;
 }
 
 .section h3 .section-toggle {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 2px 0;
-  background: none;
+  gap: 4px;
+  padding: 0;
   border-color: transparent;
+  background: none;
   color: var(--muted);
-  font: inherit;
-  letter-spacing: 1px;
-  text-transform: uppercase;
   text-align: left;
 }
 
 .section h3 .section-toggle:hover {
-  color: var(--text);
-}
-
-.chevron {
-  width: 10px;
+  color: #fff;
+  background: none;
 }
 
 .section label {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   color: var(--muted);
 }
 
@@ -446,9 +234,9 @@ button.primary kbd {
 }
 
 .readonly {
-  padding: 5px 8px;
-  border-radius: 4px;
-  background: var(--panel-2);
+  padding: 2px 8px;
+  border: 2px solid var(--ink);
+  background: var(--wall-dark);
   color: var(--text);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -456,26 +244,17 @@ button.primary kbd {
 
 .button-row {
   display: flex;
-  gap: 6px;
+  gap: 4px;
 }
 
 .button-row button {
   flex: 1;
 }
 
-button.hint {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  border-style: dashed;
-  background: none;
-  color: var(--muted);
-  text-align: left;
-}
-
-button.hint:hover {
-  color: var(--text);
+.add-things button {
+  padding-left: 2px;
+  padding-right: 2px;
+  white-space: nowrap;
 }
 
 .list {
@@ -487,16 +266,17 @@ button.hint:hover {
   gap: 2px;
 }
 
+/* Every row has the mark of a selected one, only not lit: so selecting moves nothing. */
 .row {
-  padding: 4px 6px;
-  border-radius: 4px;
   display: block;
+  padding: 2px 4px;
+  border-left: 4px solid transparent;
 }
 
 .section .row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .section .row button,
@@ -505,11 +285,12 @@ button.hint:hover {
 }
 
 .section .row button {
-  padding: 0 7px;
+  padding: 0 8px;
 }
 
 .tag {
-  font: 10px ui-monospace, monospace;
+  font: 400 8px/8px var(--font-title);
+  text-transform: uppercase;
   color: var(--muted);
 }
 
@@ -519,20 +300,20 @@ button.hint:hover {
 
 .row.clickable:hover,
 .row.selected {
-  background: var(--panel-2);
+  background: var(--floor);
 }
 
 .row.selected {
-  box-shadow: inset 2px 0 var(--accent);
+  border-left-color: var(--accent);
 }
 
 .dot {
   display: inline-block;
   flex: none;
-  width: 9px;
-  height: 9px;
-  margin-right: 6px;
-  border-radius: 2px;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  outline: 2px solid var(--ink);
 }
 
 .section .dot {
@@ -540,12 +321,12 @@ button.hint:hover {
 }
 
 .status {
-  font: 700 10px ui-monospace, monospace;
+  padding: 2px 4px;
+  background: var(--ink);
+  font: 400 8px/8px var(--font-title);
   text-transform: uppercase;
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: var(--panel-2);
   color: var(--muted);
+  vertical-align: 2px;
 }
 
 .status.finished {
@@ -575,15 +356,31 @@ button.hint:hover {
   right: var(--inset-right);
   z-index: 2;
   background: rgba(13, 24, 52, 0.94);
-  backdrop-filter: blur(2px);
-  transition:
-    left 0.15s ease-out,
-    right 0.15s ease-out;
 }
 
-/* React Flow paints its own background; the blueprint colour is the overlay's. */
+/* React Flow paints its own background; the blueprint colour is the overlay's. Its zoom
+   is not the camera's: it frames the graph at whatever size fits, so here, and only here,
+   the type is smoothed, or it could not be read when the graph is drawn smaller. */
 .graph-overlay .react-flow {
   --xy-background-color: transparent;
+  --xy-controls-box-shadow: none;
+  --xy-controls-button-background-color: var(--floor);
+  --xy-controls-button-background-color-hover: var(--floor-light);
+  --xy-controls-button-color: var(--text);
+  --xy-controls-button-color-hover: #fff;
+  --xy-controls-button-border-color: var(--ink);
+  font: inherit;
+  -webkit-font-smoothing: antialiased;
+  font-smooth: auto;
+}
+
+.graph-overlay .react-flow__controls {
+  border: 2px solid var(--ink);
+}
+
+.graph-overlay .react-flow__controls-button {
+  width: 28px;
+  height: 28px;
 }
 
 .graph-caption {
@@ -595,26 +392,26 @@ button.hint:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 6px 4px 12px;
-  background: rgba(13, 24, 52, 0.95);
-  border: 1px solid var(--blueprint);
-  border-radius: 999px;
-  font: 11px ui-monospace, monospace;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+  padding: 2px 4px 2px 8px;
+  background: #0d1834;
+  border: 2px solid var(--blueprint);
   color: var(--blueprint);
   white-space: nowrap;
+}
+
+.graph-caption strong {
+  font: 400 16px/20px var(--font-title);
+  color: var(--blueprint);
 }
 
 .flow-node {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  min-width: 150px;
-  background: var(--panel-2);
-  border: 2px solid var(--border);
-  border-radius: 6px;
+  gap: 8px;
+  padding: 6px 12px;
+  min-width: 152px;
+  background: var(--floor);
+  border: 2px solid var(--ink);
 }
 
 .flow-node.selected {
@@ -623,7 +420,7 @@ button.hint:hover {
 
 .flow-node.active {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(255, 209, 102, 0.25);
+  outline: 2px solid var(--accent);
 }
 
 .tool-node,
@@ -637,44 +434,41 @@ button.hint:hover {
 
 .table-node {
   border-style: solid;
-  border-color: #8a5a3c;
+  border-color: var(--wood);
   background: #3a2c26;
 }
 
 .terminal-node {
   min-width: 0;
   justify-content: center;
-  border-radius: 999px;
-  padding: 6px 18px;
-  font: 700 11px ui-monospace, monospace;
-  letter-spacing: 1px;
+  padding: 4px 16px;
+  font: 400 16px/20px var(--font-title);
   color: var(--muted);
 }
 
 .node-title {
-  font-weight: 700;
+  color: #fff;
 }
 
 .node-subtitle {
-  font-size: 11px;
   color: var(--muted);
 }
 
 .avatar {
-  width: 22px;
-  height: 22px;
-  border-radius: 3px;
-  border-top: 7px solid;
+  width: 24px;
+  height: 24px;
+  border-top: 8px solid;
 }
 
 .react-flow__handle {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
 }
 
 /* The graph is a picture: its handles are only where lines meet. */
 .graph-overlay .react-flow__handle {
   opacity: 0;
+  border-radius: 0;
 }
 
 /* One look per verb. A sentence left to the agent ("if it chooses") is dashed. */
@@ -704,34 +498,39 @@ button.hint:hover {
 
 .graph-overlay .react-flow__edge-text {
   fill: var(--text);
-  font-size: 10px;
+  font: 400 16px var(--font-body);
 }
 
 .graph-overlay .react-flow__edge-textbg {
-  fill: rgba(13, 24, 52, 0.9);
+  fill: #0d1834;
 }
 
 /* inspector */
 
 .inspector {
-  padding: 12px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .inspector.empty,
 .empty {
   color: var(--muted);
-  padding: 16px;
+  padding: 12px;
 }
 
 .inspector h2 {
   margin: 0;
-  font-size: 15px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  font: 400 16px/20px var(--font-title);
+  color: #fff;
+}
+
+.inspector h2 small {
+  font: 400 16px/20px var(--font-body);
 }
 
 .inspector p {
@@ -741,23 +540,27 @@ button.hint:hover {
 .tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px;
-  border-bottom: 1px solid var(--border);
+  gap: 0 4px;
+  border-bottom: 2px solid var(--ink);
 }
 
 .tabs button {
+  padding: 0 4px;
   border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
+  border-bottom: 4px solid transparent;
   background: none;
-  padding: 4px 6px;
   color: var(--muted);
-  font-size: 12px;
+}
+
+.tabs button:hover:not(:disabled) {
+  background: none;
+  color: #fff;
 }
 
 .tabs button.active {
-  color: var(--text);
+  color: var(--accent);
   border-bottom-color: var(--accent);
+  background: none;
 }
 
 .form,
@@ -771,58 +574,42 @@ button.hint:hover {
 .form label {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   color: var(--muted);
 }
 
 .form fieldset {
-  border: 1px solid var(--border);
-  border-radius: 4px;
   margin: 0;
-  padding: 6px 8px;
+  padding: 4px 8px 8px;
+  border: 2px solid var(--ink);
   color: var(--muted);
 }
 
-.form label.checkbox {
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-  color: var(--text);
-}
-
-.form label.checkbox input {
-  width: auto;
-}
-
 .field dt {
-  font: 700 10px ui-monospace, monospace;
-  letter-spacing: 1px;
-  text-transform: uppercase;
   color: var(--muted);
 }
 
 .field dd {
-  margin: 2px 0 0;
+  margin: 0;
   overflow-wrap: anywhere;
 }
 
 .field .message {
+  padding: 2px 8px;
+  border: 2px solid var(--ink);
+  background: var(--wall-dark);
   white-space: pre-wrap;
-  background: var(--panel-2);
-  padding: 6px 8px;
-  border-radius: 4px;
 }
 
 .json {
   margin: 4px 0 0;
-  padding: 6px 8px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font: 11px/1.45 ui-monospace, monospace;
+  padding: 4px 8px;
+  background: var(--wall-dark);
+  border: 2px solid var(--ink);
+  font: inherit;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  max-height: 260px;
+  max-height: 264px;
   overflow: auto;
 }
 
@@ -835,27 +622,45 @@ button.hint:hover {
 .relations {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+}
+
+.slots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 /* The three slots of a character: what arrives, what it consults, where its sheet goes. */
 .slot {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
 }
 
 .slot + .slot {
-  margin-top: 4px;
   padding-top: 8px;
-  border-top: 1px dashed var(--border);
+  border-top: 2px dashed var(--border);
 }
 
 .slot h4 {
   margin: 0;
-  font: 700 10px ui-monospace, monospace;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+  font: inherit;
+  color: var(--accent);
+}
+
+.relations p {
+  margin: 0;
+}
+
+.relation {
+  padding: 2px 8px;
+  border: 2px solid var(--ink);
+  background: var(--wall-dark);
+  color: var(--text);
+}
+
+.relation .sentence strong {
   color: var(--accent);
 }
 
@@ -865,8 +670,9 @@ button.hint:hover {
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
+  border-style: dashed;
+  border-color: var(--border);
   background: none;
-  border: 1px dashed var(--border);
   color: var(--muted);
 }
 
@@ -876,12 +682,51 @@ button.hint:hover {
 
 .relation .sentence select.phrase {
   width: auto;
-  padding: 1px 4px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.relation-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  color: var(--muted);
+}
+
+.relation-tools .spacer {
+  flex: 1;
 }
 
 .relation-tools select {
   width: auto;
-  padding: 1px 4px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.relation-tools label {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+}
+
+.relation-tools .rounds input {
+  width: 48px;
+  padding: 0 4px;
+}
+
+/* A sentence is added by saying its verb here: one button for each thing that can be said. */
+.relation-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.relation-add button {
+  flex: none;
+  padding: 0 6px;
 }
 
 .form fieldset.script {
@@ -894,73 +739,11 @@ button.hint:hover {
   align-self: flex-start;
 }
 
-.relations p {
-  margin: 0;
-}
-
-.relation {
-  padding: 5px 7px;
-  border-radius: 4px;
-  background: var(--panel-2);
-  color: var(--text);
-}
-
-.relation .sentence strong {
-  color: var(--accent);
-}
-
-.relation-tools {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 2px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.relation-tools .spacer {
-  flex: 1;
-}
-
-.relation-tools label {
-  flex-direction: row;
-  align-items: center;
-  gap: 4px;
-  color: var(--muted);
-}
-
-.relation-tools input[type="checkbox"] {
-  width: auto;
-}
-
-.relation-tools .rounds input {
-  width: 46px;
-  padding: 1px 4px;
-}
-
-.relation-add {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-
-.relation-add select {
-  flex: 1 1 100px;
-  width: auto;
-  min-width: 0;
-}
-
-/* The verb is the longer of the two: it gets the room to be read whole. */
-.relation-add select:first-of-type {
-  flex-basis: 150px;
-}
-
 .rule {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
+  gap: 4px;
+  margin-bottom: 4px;
 }
 
 .rule input,
@@ -970,14 +753,10 @@ button.hint:hover {
 }
 
 .notice {
-  padding: 5px 8px;
-  border-left: 3px solid var(--accent);
-  background: rgba(255, 209, 102, 0.1);
+  padding: 2px 8px;
+  border-left: 4px solid var(--accent);
+  background: var(--floor);
   color: var(--text);
-}
-
-.section h3 button + button {
-  margin-left: -2px;
 }
 
 /* sheets */
@@ -985,15 +764,14 @@ button.hint:hover {
 .sheet-icon {
   display: inline-block;
   flex: none;
-  width: 9px;
-  height: 11px;
-  margin-right: 6px;
-  vertical-align: -1px;
+  width: 8px;
+  height: 10px;
+  margin: 0 8px 0 2px;
   background:
-    linear-gradient(#9aa4bf, #9aa4bf) 2px 3px / 5px 1px no-repeat,
-    linear-gradient(#9aa4bf, #9aa4bf) 2px 6px / 5px 1px no-repeat,
-    #f4f1e8;
-  box-shadow: 0 0 0 1px var(--ink);
+    linear-gradient(var(--muted), var(--muted)) 2px 2px / 4px 2px no-repeat,
+    linear-gradient(var(--muted), var(--muted)) 2px 6px / 4px 2px no-repeat,
+    var(--paper);
+  outline: 2px solid var(--ink);
 }
 
 /* Put away: still there to read, but no longer on anyone's desk. */
@@ -1002,7 +780,7 @@ button.hint:hover {
 }
 
 .section .sheet-icon {
-  margin-right: 0;
+  margin-right: 2px;
 }
 
 .section .row.sheet-row {
@@ -1017,13 +795,12 @@ button.hint:hover {
   white-space: nowrap;
 }
 
+/* A sheet read in a window is a sheet of paper: the one light thing in a dark interface. */
 .sheet-content {
-  padding: 10px 12px;
-  background: #f4f1e8;
-  color: #1a1c2c;
-  border-radius: 2px;
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
-  font: 12px/1.5 ui-monospace, monospace;
+  padding: 8px 12px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--ink);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: 320px;
@@ -1037,21 +814,12 @@ button.hint:hover {
 .sheet-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
 }
 
 .sheet-links button {
   display: inline-flex;
   align-items: center;
-}
-
-button.link {
-  padding: 0;
-  background: none;
-  border: 0;
-  border-radius: 0;
-  color: var(--blueprint);
-  text-decoration: underline;
 }
 
 /* shortcut list */
@@ -1061,43 +829,46 @@ button.link {
   top: var(--hud-gap);
   right: calc(var(--inset-right) + var(--hud-gap));
   z-index: 6;
-  width: 300px;
+  width: 448px;
   max-height: calc(100% - 2 * var(--hud-gap));
-  display: flex;
-  flex-direction: column;
-  background: rgba(28, 31, 46, 0.98);
-  border: 2px solid var(--ink);
-  border-radius: 6px;
-  box-shadow:
-    inset 0 0 0 1px var(--border),
-    4px 4px 0 rgba(0, 0, 0, 0.35);
 }
 
 .help-body {
-  min-height: 0;
-  overflow-y: auto;
-  padding: 10px 12px 12px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
 .help dl {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .help dl div {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
 .help dt {
   flex: none;
-  width: 104px;
+  width: 120px;
   color: var(--muted);
+}
+
+/* Here the keys are what is being read: at the size of the text, not of a hint. */
+.help dt kbd {
+  padding: 0 6px;
+  font: inherit;
+  color: var(--text);
+  text-transform: none;
+  vertical-align: 0;
+}
+
+.help dt:not(:has(kbd)) {
+  width: 200px;
 }
 
 .help dd {
@@ -1116,41 +887,15 @@ button.link {
 
 .build-menu {
   position: absolute;
-  width: 300px;
-  display: flex;
-  flex-direction: column;
-  pointer-events: auto;
-  background: rgba(28, 31, 46, 0.98);
-  border: 2px solid var(--ink);
-  border-radius: 6px;
-  box-shadow:
-    inset 0 0 0 1px var(--border),
-    4px 4px 0 rgba(0, 0, 0, 0.35);
+  width: 328px;
 }
 
 .build-menu.floor-menu {
-  width: 220px;
+  width: 232px;
 }
 
 .build-menu-header {
-  flex: none;
-  display: flex;
   align-items: baseline;
-  gap: 8px;
-  padding: 6px 6px 6px 10px;
-  border-bottom: 1px solid var(--border);
-}
-
-.build-menu-header strong {
-  color: var(--accent);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.build-menu-header small {
-  color: var(--muted);
-  white-space: nowrap;
 }
 
 .build-menu-header .spacer {
@@ -1158,9 +903,7 @@ button.link {
 }
 
 .build-menu-body {
-  min-height: 0;
-  overflow-y: auto;
-  padding: 8px 10px 10px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1173,20 +916,7 @@ button.link {
 .build-menu-actions {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-
-.slots {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-/* A sentence is added by saying its verb here: one button for each thing that can be said. */
-.build-menu .relation-add button {
-  flex: none;
-  padding: 2px 7px;
-  font-size: 12px;
+  gap: 4px;
 }
 
 .picking-bar {
@@ -1195,22 +925,18 @@ button.link {
   left: calc(var(--inset-left) + var(--hud-gap));
   right: calc(var(--inset-right) + var(--hud-gap));
   margin: 0 auto;
-  max-width: 620px;
+  max-width: 656px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 7px 10px;
+  gap: 4px;
+  padding: 4px 8px;
   pointer-events: auto;
-  background: rgba(28, 31, 46, 0.98);
-  border: 2px solid var(--accent);
-  border-radius: 6px;
-  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35);
 }
 
 .picking-line {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .picking-line strong {
@@ -1226,36 +952,34 @@ button.link {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .palette button {
   display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px;
+  text-align: left;
+}
+
+.palette button span {
+  display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  padding: 3px 8px;
 }
 
 .palette button small {
   color: var(--muted);
-  font-size: 10px;
 }
 
-.add-things button {
-  flex: 1;
-  padding-left: 4px;
-  padding-right: 4px;
-  white-space: nowrap;
-}
-
-/* dock: the timeline drawer and the playback bar */
+/* dock: the timeline drawer, and under it the icon bar and the playback strip */
 
 .dock {
   flex: none;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--panel);
+  background: linear-gradient(var(--floor) 0 2px, var(--wall) 2px);
   border-top: 2px solid var(--ink);
 }
 
@@ -1263,19 +987,64 @@ button.link {
   display: flex;
   max-height: 232px;
   min-height: 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 2px solid var(--ink);
+  background: var(--wall-dark);
+}
+
+.dock-row {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+/* One icon per window, lit while it is open; the letter under it is its key. */
+.icon-bar {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px 8px;
+  border-right: 2px solid var(--ink);
+}
+
+.bar-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 40px;
+  padding: 2px 0;
+  color: var(--muted);
+}
+
+.bar-icon kbd {
+  vertical-align: 0;
+}
+
+.bar-icon.lit,
+.bar-icon.lit:hover:not(:disabled) {
+  color: var(--ink);
+  background: linear-gradient(var(--accent-dark) 0 2px, var(--accent) 2px calc(100% - 2px), var(--accent-light) calc(100% - 2px));
 }
 
 .playback-bar {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: 4px;
+  padding: 4px 8px;
 }
 
 .playback-bar button {
-  min-width: 34px;
+  flex: none;
+  min-width: 32px;
   white-space: nowrap;
+}
+
+.playback-bar button.play {
+  min-width: 40px;
 }
 
 .playback-bar button.icon {
@@ -1283,47 +1052,39 @@ button.link {
 }
 
 .playback-bar select {
-  width: auto;
+  flex: none;
+  width: 72px;
 }
 
 .playback-bar input[type="range"] {
   flex: 1;
-  min-width: 60px;
-  padding: 0;
-  accent-color: var(--accent);
+  min-width: 64px;
 }
 
-/* Collapsed, the bar is a thin strip: the progress, which opens it again, and the zoom. */
+/* Folded, the strip is only the progress, which unfolds it again, and the zoom. */
 .playback-strip {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  align-items: stretch;
-  width: 100%;
-  height: 20px;
-  background: var(--bg);
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
 }
 
 .playback-strip .strip-progress {
   position: relative;
   flex: 1;
   min-width: 0;
+  height: 16px;
   padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
+  background: var(--wall-dark);
   overflow: hidden;
 }
 
 .playback-strip .fill {
   position: absolute;
   inset: 0 auto 0 0;
-  background: var(--accent);
-  opacity: 0.55;
-}
-
-.playback-strip .label {
-  position: relative;
-  font: 700 10px/20px ui-monospace, monospace;
-  color: var(--text);
+  background: var(--accent-dark);
 }
 
 /* Zoom: out, the step the camera rests at (which frames the room again), in. Three
@@ -1337,27 +1098,16 @@ button.link {
 .zoom button,
 .playback-bar .zoom button {
   min-width: 28px;
-  padding: 3px 7px;
-  border-radius: 0;
-  font: 700 14px/1 ui-monospace, monospace;
+  padding: 2px 6px;
 }
 
 .zoom button + button {
-  border-left: 0;
-}
-
-.zoom button:first-child {
-  border-radius: 4px 0 0 4px;
-}
-
-.zoom button:last-child {
-  border-radius: 0 4px 4px 0;
+  margin-left: -2px;
 }
 
 .zoom .zoom-level,
 .playback-bar .zoom .zoom-level {
   min-width: 40px;
-  font-size: 12px;
   color: var(--accent);
 }
 
@@ -1366,27 +1116,18 @@ button.link {
   color: var(--text);
 }
 
-.playback-strip .zoom button {
-  padding: 0 7px;
-  border-top: 0;
-  border-bottom: 0;
-  border-radius: 0;
-  font-size: 12px;
-  line-height: 18px;
-}
-
 .counter {
-  font: 12px ui-monospace, monospace;
-  min-width: 64px;
+  flex: none;
+  min-width: 72px;
   text-align: right;
 }
 
 .badge {
-  font: 700 10px ui-monospace, monospace;
-  letter-spacing: 1px;
-  padding: 2px 7px;
-  border-radius: 3px;
-  background: var(--panel-2);
+  flex: none;
+  padding: 2px 4px;
+  background: var(--ink);
+  font: 400 8px/8px var(--font-title);
+  text-transform: uppercase;
   color: var(--muted);
   white-space: nowrap;
 }
@@ -1394,6 +1135,10 @@ button.link {
 .badge.live {
   background: var(--live);
   color: #fff;
+}
+
+.badge.replay {
+  color: var(--accent);
 }
 
 .timeline {
@@ -1406,9 +1151,8 @@ button.link {
 
 .timeline-labels {
   flex: none;
-  width: 96px;
-  border-right: 1px solid var(--border);
-  font-size: 12px;
+  width: 104px;
+  border-right: 2px solid var(--ink);
 }
 
 .timeline-labels div {
@@ -1449,12 +1193,13 @@ button.link {
   opacity: 0.3;
 }
 
-.timeline-event.current circle {
+/* On show: the mark is ringed, and so is the whole step it stands in. */
+.timeline-event.current rect {
   stroke: var(--accent);
-  stroke-width: 3;
+  stroke-width: 2;
 }
 
-.timeline-event circle.selected {
+.timeline-event .mark.selected {
   stroke: #fff;
   stroke-width: 2;
 }
@@ -1467,29 +1212,29 @@ button.link {
 
 .transcript li {
   display: flex;
-  gap: 10px;
-  padding: 2px 10px;
+  gap: 8px;
+  padding: 0 8px 0 4px;
+  border-left: 4px solid transparent;
   cursor: pointer;
 }
 
 .transcript time {
   flex: none;
-  font: 11px/1.6 ui-monospace, monospace;
   color: var(--muted);
 }
 
 .transcript li.pending {
-  opacity: 0.35;
+  opacity: 0.4;
 }
 
 .transcript li.current {
-  background: rgba(255, 209, 102, 0.12);
-  box-shadow: inset 3px 0 var(--accent);
+  background: var(--floor);
+  border-left-color: var(--accent);
 }
 
 .transcript li.selected {
-  outline: 1px solid var(--muted);
-  outline-offset: -1px;
+  outline: 2px solid var(--muted);
+  outline-offset: -2px;
 }
 
 .transcript li.error {

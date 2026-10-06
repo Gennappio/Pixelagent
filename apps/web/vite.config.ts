@@ -10,5 +10,10 @@ export default defineConfig({
       "/api": { target: server, ws: true, rewrite: (path) => path.replace(/^\/api/, "") },
     },
   },
-  test: { environment: "node" },
+  test: {
+    environment: "node",
+    // Tests see a stylesheet as an empty file, except one read as text (`?raw`): the test
+    // of the chrome reads the stylesheets themselves.
+    css: { include: [/\.css\?raw$/] },
+  },
 });

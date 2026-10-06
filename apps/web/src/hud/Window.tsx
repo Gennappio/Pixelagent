@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { useUiStore } from "../state/uiStore";
 import type { PanelId } from "./panels";
+import { PixelIcon } from "./PixelIcon";
 
-interface PanelProps {
+interface WindowProps {
   id: PanelId;
   title: string;
   hotkey: string;
@@ -10,33 +11,24 @@ interface PanelProps {
   children: ReactNode;
 }
 
-/** A floating HUD panel. Collapsed, it shrinks to a tab that brings it back. */
-export function Panel({ id, title, hotkey, className = "", children }: PanelProps) {
+/**
+ * A window laid on the office: a pixel-art frame, a title, and a way to close it. Closed,
+ * it is not there at all: it comes back from its icon on the bar, or from its key.
+ */
+export function Window({ id, title, hotkey, className = "", children }: WindowProps) {
   const open = useUiStore((state) => state.panels[id]);
   const toggle = useUiStore((state) => state.toggle);
-
-  if (!open) {
-    return (
-      <button className={`panel-tab ${className}`} title={`Show ${title} (${hotkey})`} onClick={() => toggle(id)}>
-        {title} <kbd>{hotkey}</kbd>
-      </button>
-    );
-  }
+  if (!open) return null;
   return (
-    <section className={`panel ${className}`} aria-label={title}>
-      <header className="panel-header">
+    <section className={`window ${className}`} aria-label={title}>
+      <header className="window-title">
         <span>{title}</span>
         <kbd>{hotkey}</kbd>
-        <button
-          className="icon"
-          title={`Hide ${title} (${hotkey})`}
-          aria-label={`Hide ${title}`}
-          onClick={() => toggle(id)}
-        >
-          –
+        <button type="button" className="icon" title={`Close ${title} (${hotkey})`} aria-label={`Close ${title}`} onClick={() => toggle(id)}>
+          <PixelIcon name="close" />
         </button>
       </header>
-      <div className="panel-body">{children}</div>
+      <div className="window-body">{children}</div>
     </section>
   );
 }
@@ -49,15 +41,15 @@ interface SectionProps {
   children: ReactNode;
 }
 
-/** A collapsible group inside a panel. */
+/** A group inside a window that folds away under its heading. */
 export function Section({ id, title, actions, children }: SectionProps) {
   const open = useUiStore((state) => state.panels[id]);
   const toggle = useUiStore((state) => state.toggle);
   return (
     <section className="section">
       <h3>
-        <button className="section-toggle" aria-expanded={open} onClick={() => toggle(id)}>
-          <span className="chevron">{open ? "▾" : "▸"}</span>
+        <button type="button" className="section-toggle" aria-expanded={open} onClick={() => toggle(id)}>
+          <PixelIcon name={open ? "open" : "closed"} />
           {title}
         </button>
         {open && actions}

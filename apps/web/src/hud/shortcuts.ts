@@ -20,7 +20,7 @@ export type ShortcutAction =
   | { type: "run" }
   | { type: "save" };
 
-export type ShortcutGroup = "Panels" | "Playback" | "Camera" | "Workflow";
+export type ShortcutGroup = "Windows" | "Playback" | "Camera" | "Workflow";
 
 export interface Shortcut {
   group: ShortcutGroup;
@@ -40,15 +40,15 @@ export interface Shortcut {
 const panel = (id: PanelId): ShortcutAction => ({ type: "togglePanel", panel: id });
 
 export const SHORTCUTS: Shortcut[] = [
-  { group: "Panels", keys: ["o"], label: "O", description: "Office: the workflow file and its runs", action: panel("office") },
-  { group: "Panels", keys: ["i"], label: "I", description: "Inspector", action: panel("inspector") },
-  { group: "Panels", keys: ["l"], label: "L", description: "Log of the run on screen", action: panel("log") },
-  { group: "Panels", keys: ["t"], label: "T", description: "Timeline", action: panel("timeline") },
-  { group: "Panels", keys: ["b"], label: "B", description: "Playback bar", action: panel("playback") },
-  { group: "Panels", keys: ["g"], label: "G", description: "Graph of the workflow", action: panel("graph") },
-  { group: "Panels", keys: ["h"], label: "H", description: "Hide or bring back every panel", action: { type: "toggleAll" } },
-  { group: "Panels", keys: ["Escape"], whileTyping: true, label: "Esc", description: "Cancel a pick, close the graph or a menu, clear the selection", action: { type: "escape" } },
-  { group: "Panels", keys: ["?"], label: "?", description: "This list", action: { type: "help" } },
+  { group: "Windows", keys: ["o"], label: "O", description: "Office: the workflow file and its runs", action: panel("office") },
+  { group: "Windows", keys: ["i"], label: "I", description: "Inspector", action: panel("inspector") },
+  { group: "Windows", keys: ["l"], label: "L", description: "Log of the run on screen", action: panel("log") },
+  { group: "Windows", keys: ["t"], label: "T", description: "Timeline", action: panel("timeline") },
+  { group: "Windows", keys: ["b"], label: "B", description: "Playback controls, or only the strip", action: panel("playback") },
+  { group: "Windows", keys: ["g"], label: "G", description: "Graph of the workflow", action: panel("graph") },
+  { group: "Windows", keys: ["h"], label: "H", description: "Hide every window, or bring them back", action: { type: "toggleAll" } },
+  { group: "Windows", keys: ["Escape"], whileTyping: true, label: "Esc", description: "Cancel a pick, close the graph or a menu, clear the selection", action: { type: "escape" } },
+  { group: "Windows", keys: ["?"], label: "?", description: "This list", action: { type: "help" } },
 
   { group: "Playback", keys: [" "], label: "Space", description: "Play or pause", action: { type: "playPause" } },
   { group: "Playback", keys: ["ArrowRight"], repeat: true, label: "→", description: "Next event", action: { type: "next" } },

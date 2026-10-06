@@ -1,4 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { PixelIcon } from "../hud/PixelIcon";
 import { Slots } from "../inspector/RelationEditor";
 import { canConsultFirst, sentence, verbInfo } from "../protocol/relations";
 import { toolLabel, type Agent, type Position, type Workflow, type WorkflowTable } from "../protocol/workflow";
@@ -40,15 +41,15 @@ function Frame({ title, subtitle, children }: { title: string; subtitle?: string
   const closeMenu = useUiStore((state) => state.closeMenu);
   return (
     <>
-      <header className="build-menu-header">
+      <header className="window-title build-menu-header">
         <strong>{title}</strong>
         {subtitle && <small>{subtitle}</small>}
         <span className="spacer" />
         <button type="button" className="icon" title="Close (Esc)" aria-label="Close" onClick={closeMenu}>
-          ✕
+          <PixelIcon name="close" />
         </button>
       </header>
-      <div className="build-menu-body">{children}</div>
+      <div className="window-body build-menu-body">{children}</div>
     </>
   );
 }
@@ -228,7 +229,7 @@ export function ContextMenu({ target, insets }: { target: MenuTarget; insets: In
   const workflow = useWorkflowStore((state) => state.workflow);
   const framing = useCameraStore((state) => state.framing);
   const box = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ width: 300, height: 320 });
+  const [size, setSize] = useState({ width: 328, height: 320 });
   const [stage, setStage] = useState({ width: 0, height: 0 });
 
   // The menu's own size depends on what is in it, and the stage's on the window: measure both.
@@ -262,7 +263,7 @@ export function ContextMenu({ target, insets }: { target: MenuTarget; insets: In
   return (
     <div
       ref={box}
-      className={`build-menu ${target.kind}-menu side-${placed.side}`}
+      className={`window build-menu ${target.kind}-menu side-${placed.side}`}
       role="dialog"
       aria-label={label}
       // Until the stage has been measured there is nowhere to put it.

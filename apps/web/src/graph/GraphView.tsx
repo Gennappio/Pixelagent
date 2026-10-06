@@ -68,6 +68,8 @@ export function GraphView({ workflow }: { workflow: Workflow }) {
           // Tools and tables hang below the agents; hand-offs run left to right.
           sourceHandle: edge.verb === "sends_to" || edge.verb === "waits_for" || edge.verb === "is_exit" ? null : edge.verb === "is_entry" ? null : "below",
           label: edge.label || undefined,
+          labelBgBorderRadius: 0,
+          labelBgPadding: [4, 2],
           className: `edge-${edge.verb}${edge.optional ? " edge-optional" : ""}`,
           markerEnd: { type: MarkerType.ArrowClosed },
         }),
@@ -94,7 +96,8 @@ export function GraphView({ workflow }: { workflow: Workflow }) {
       disableKeyboardA11y
       colorMode="dark"
       fitView
-      fitViewOptions={{ maxZoom: 1, padding: 0.2 }}
+      // Never larger than drawn: at its own size the type of the graph is on its pixels.
+      fitViewOptions={{ maxZoom: 1, padding: 0.1 }}
       proOptions={{ hideAttribution: true }}
     >
       <Background gap={24} variant={BackgroundVariant.Lines} color="rgba(127, 178, 255, 0.09)" />

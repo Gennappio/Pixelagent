@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { PixelIcon } from "../hud/PixelIcon";
+import { toolIcon } from "../pixel/bitmaps";
 import { toolLabel } from "../protocol/workflow";
 import { useUiStore } from "../state/uiStore";
 import { useWorkflowStore } from "../state/workflowStore";
@@ -21,7 +23,7 @@ export function PickingBar({ pending }: { pending: PendingSentence }) {
   const forATool = pending.verb === "uses_tool";
 
   return (
-    <div className="picking-bar" role="status" aria-label="Pick a target">
+    <div className="picking-bar frame-lit" role="status" aria-label="Pick a target">
       <div className="picking-line">
         <strong>{said}</strong>
         <span>
@@ -45,8 +47,11 @@ export function PickingBar({ pending }: { pending: PendingSentence }) {
                 stopPicking();
               }}
             >
-              {toolLabel(tool.name)}
-              <small>{consultNote(tools, tool.name)}</small>
+              <PixelIcon name={toolIcon(tool.name)} />
+              <span>
+                {toolLabel(tool.name)}
+                <small>{consultNote(tools, tool.name)}</small>
+              </span>
             </button>
           ))}
         </div>

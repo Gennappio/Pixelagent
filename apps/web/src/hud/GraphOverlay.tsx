@@ -2,6 +2,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { GraphView } from "../graph/GraphView";
 import type { Workflow } from "../protocol/workflow";
 import { useUiStore } from "../state/uiStore";
+import { PixelIcon } from "./PixelIcon";
 
 interface Props {
   workflow: Workflow;
@@ -23,7 +24,7 @@ export function GraphOverlay({ workflow, resetKey, executed }: Props) {
         <span>{executed ? "as executed" : "drawn from what the agents do"}</span>
         <kbd>G</kbd>
         <button className="icon" title="Close the graph (G)" aria-label="Close the graph" onClick={() => setPanel("graph", false)}>
-          ✕
+          <PixelIcon name="close" />
         </button>
       </div>
       <ReactFlowProvider>

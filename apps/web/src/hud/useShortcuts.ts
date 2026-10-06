@@ -5,6 +5,7 @@ import { zoomCamera } from "../state/cameraStore";
 import { replay, seekToPosition } from "../state/replayStore";
 import { useRunStore } from "../state/runStore";
 import { useUiStore } from "../state/uiStore";
+import { canOpen } from "./barIcons";
 import { shortcutFor, type KeyTarget, type ShortcutAction } from "./shortcuts";
 
 function targetKind(target: EventTarget | null): KeyTarget {
@@ -14,11 +15,14 @@ function targetKind(target: EventTarget | null): KeyTarget {
   return "other";
 }
 
-function perform(action: ShortcutAction): void {
+/** Does what a shortcut stands for. The keyboard and the icon bar both come through here. */
+export function performShortcut(action: ShortcutAction): void {
   const ui = useUiStore.getState();
   const { playing, speed, total, streaming } = replay.getSnapshot();
   switch (action.type) {
     case "togglePanel":
+      // What a greyed icon cannot do, its key cannot do either.
+      if (action.panel === "log" && !canOpen("log", useRunStore.getState().run !== null)) return;
       return ui.toggle(action.panel);
     case "toggleAll":
       return ui.toggleAll();
@@ -75,7 +79,7 @@ export function useShortcuts(): void {
       });
       if (!action) return;
       event.preventDefault();
-      perform(action);
+      performShortcut(action);
     };
 
     // A button clicked with the mouse would keep the focus and swallow the next Space.

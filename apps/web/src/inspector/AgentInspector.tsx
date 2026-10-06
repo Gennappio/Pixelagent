@@ -57,7 +57,7 @@ function ConfigurationAsExecuted({ workflow, agent, names }: { workflow: Workflo
   return (
     <>
       <p className="muted">As executed in this run.</p>
-      <button onClick={backToBuild}>◂ Back to BUILD to edit</button>
+      <button onClick={backToBuild}>Back to BUILD to edit</button>
       <dl className="fields">
         <Field label="Name">{agent.name}</Field>
         <Field label="Role">{agent.role || "—"}</Field>

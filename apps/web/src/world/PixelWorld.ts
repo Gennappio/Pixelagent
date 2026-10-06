@@ -4,6 +4,7 @@ import { NO_INSETS, WorldCamera, type CameraView, type Framing, type Insets } fr
 import { DocumentSprite } from "./DocumentSprite";
 import { TableSprite, Tray } from "./Furniture";
 import { clampToRoom, ROOM, type Placed, type WorldLayout } from "./layout";
+import { loadWorldFonts } from "./pixel";
 import { SpeechBubble } from "./SpeechBubble";
 import { ToolStation } from "./ToolStation";
 import { sheetPosition, type WorldState } from "./worldState";
@@ -136,13 +137,17 @@ export class PixelWorld {
   }
 
   private async init(): Promise<void> {
-    await this.app.init({
-      resizeTo: this.host,
-      background: 0x14161f,
-      antialias: false,
-      autoDensity: true,
-      resolution: window.devicePixelRatio || 1,
-    });
+    // Nothing is drawn before the fonts are there: a label drawn in another font stays in it.
+    await Promise.all([
+      this.app.init({
+        resizeTo: this.host,
+        background: 0x14161f,
+        antialias: false,
+        autoDensity: true,
+        resolution: window.devicePixelRatio || 1,
+      }),
+      loadWorldFonts(),
+    ]);
     // destroy() may have been called while the renderer was still starting up.
     if (this.destroyed) {
       this.app.destroy(true, { children: true });

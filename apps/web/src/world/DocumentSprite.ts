@@ -1,5 +1,6 @@
-import { Container, Graphics, Rectangle, Text } from "pixi.js";
+import { Container, Graphics, Rectangle, type Text } from "pixi.js";
 import type { Position } from "../protocol/workflow";
+import { centred, pixelText } from "./pixel";
 
 const INK = 0x1a1c2c;
 const PAPER = 0xf4f1e8;
@@ -25,12 +26,7 @@ export class DocumentSprite extends Container {
       .fill(WRITING);
 
     // Only sheets that have been rewritten say which version they are.
-    this.badge = new Text({
-      text: "",
-      style: { fontFamily: "monospace", fontSize: 8, fontWeight: "bold", fill: 0xffffff, stroke: { color: INK, width: 2, join: "round" } },
-      resolution: 3,
-    });
-    this.badge.anchor.set(0.5, 0);
+    this.badge = pixelText("", { fill: 0xffffff, small: true, outlined: true });
     this.badge.y = 7;
 
     this.mark.visible = false;
@@ -46,6 +42,9 @@ export class DocumentSprite extends Container {
     this.position.set(Math.round(position.x), Math.round(position.y));
     this.mark.visible = selected;
     const label = version > 1 ? `v${version}` : "";
-    if (this.badge.text !== label) this.badge.text = label;
+    if (this.badge.text !== label) {
+      this.badge.text = label;
+      this.badge.x = centred(this.badge.width);
+    }
   }
 }

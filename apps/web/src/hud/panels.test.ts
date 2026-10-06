@@ -23,8 +23,10 @@ function memoryStorage(initial: Record<string, string> = {}) {
 }
 
 describe("panel state", () => {
-  it("starts with the world unobstructed on the right and no graph", () => {
-    expect(PANEL_DEFAULTS).toMatchObject({ office: true, inspector: false, timeline: false, playback: true, graph: false });
+  it("starts with nothing open but the playback strip", () => {
+    expect(PANEL_DEFAULTS).toMatchObject({ office: false, inspector: false, log: false, timeline: false, playback: true, graph: false });
+    // A window that is opened shows everything it has: no section starts folded.
+    for (const [id, open] of Object.entries(PANEL_DEFAULTS)) if (id.includes(".")) expect(open, id).toBe(true);
   });
 
   it("toggles one panel without touching the others or the original", () => {
@@ -35,13 +37,13 @@ describe("panel state", () => {
   });
 
   it("keeps the same object when setting a panel to the state it already has", () => {
-    expect(setPanel(PANEL_DEFAULTS, "office", true)).toBe(PANEL_DEFAULTS);
-    expect(setPanel(PANEL_DEFAULTS, "office", false).office).toBe(false);
+    expect(setPanel(PANEL_DEFAULTS, "office", false)).toBe(PANEL_DEFAULTS);
+    expect(setPanel(PANEL_DEFAULTS, "office", true).office).toBe(true);
   });
 });
 
 describe("hide all", () => {
-  const custom = { ...PANEL_DEFAULTS, inspector: true, timeline: true, graph: true, "office.runs": false };
+  const custom = { ...PANEL_DEFAULTS, office: true, inspector: true, timeline: true, graph: true, "office.runs": false };
 
   it("collapses every panel and remembers what was open", () => {
     const hidden = toggleAll(custom, null);
@@ -71,7 +73,7 @@ describe("hide all", () => {
 describe("persistence", () => {
   it("round-trips through storage", () => {
     const storage = memoryStorage();
-    const panels = { ...PANEL_DEFAULTS, office: false, timeline: true, "office.tools": false };
+    const panels = { ...PANEL_DEFAULTS, office: true, timeline: true, "office.tools": false };
     savePanels(storage, panels);
     expect(storage.data.has(STORAGE_KEY)).toBe(true);
     expect(loadPanels(storage)).toEqual(panels);
@@ -87,14 +89,14 @@ describe("persistence", () => {
     expect(parsePanels("{ not json")).toEqual(PANEL_DEFAULTS);
     expect(parsePanels("[1, 2]")).toEqual(PANEL_DEFAULTS);
     expect(parsePanels('"office"')).toEqual(PANEL_DEFAULTS);
-    expect(parsePanels(JSON.stringify({ office: "no", timeline: true, minimap: true }))).toEqual({
+    expect(parsePanels(JSON.stringify({ office: "yes", timeline: true, minimap: true }))).toEqual({
       ...PANEL_DEFAULTS,
       timeline: true,
     });
   });
 
   it("fills in panels added after the state was stored", () => {
-    expect(parsePanels(JSON.stringify({ office: false }))).toEqual({ ...PANEL_DEFAULTS, office: false });
+    expect(parsePanels(JSON.stringify({ office: true }))).toEqual({ ...PANEL_DEFAULTS, office: true });
   });
 
   it("survives storage that throws", () => {

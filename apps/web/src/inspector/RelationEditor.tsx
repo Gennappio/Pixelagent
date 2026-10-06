@@ -1,4 +1,5 @@
 import { hasTargets, pickTargets, type PendingSentence } from "../build/picking";
+import { PixelIcon } from "../hud/PixelIcon";
 import { addRelation, canRelate, moveRelation, removeRelation, updateRelation } from "../build/workflowEdits";
 import {
   canConsultFirst,
@@ -115,13 +116,13 @@ function Sentence({ workflow, relation, editable, first, last }: { workflow: Wor
         )}
         <span className="spacer" />
         <button type="button" className="icon" title="Earlier" disabled={first} onClick={() => edit((current) => moveRelation(current, relation.id, -1))}>
-          ↑
+          <PixelIcon name="up" />
         </button>
         <button type="button" className="icon" title="Later" disabled={last} onClick={() => edit((current) => moveRelation(current, relation.id, 1))}>
-          ↓
+          <PixelIcon name="down" />
         </button>
         <button type="button" className="icon" title={`Remove: ${sentence(workflow, relation)}`} onClick={() => edit((current) => removeRelation(current, relation.id))}>
-          ✕
+          <PixelIcon name="close" />
         </button>
       </div>
     </li>

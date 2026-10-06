@@ -1,5 +1,6 @@
 import { fitCamera, useCameraStore, zoomCamera } from "../state/cameraStore";
 import { adjacentStep, zoomLabel } from "../world/Camera";
+import { PixelIcon } from "./PixelIcon";
 
 /**
  * The two buttons that make it obvious the world zooms, with the step it is at between
@@ -10,7 +11,7 @@ export function ZoomControl() {
   return (
     <span className="zoom" role="group" aria-label="Zoom">
       <button title="Zoom out (−)" aria-label="Zoom out" disabled={adjacentStep(scale, -1) === scale} onClick={() => zoomCamera(-1)}>
-        −
+        <PixelIcon name="minus" />
       </button>
       <button
         className={`zoom-level${fitted ? " fitted" : ""}`}
@@ -21,7 +22,7 @@ export function ZoomControl() {
         {zoomLabel(scale)}
       </button>
       <button title="Zoom in (+)" aria-label="Zoom in" disabled={adjacentStep(scale, 1) === scale} onClick={() => zoomCamera(1)}>
-        +
+        <PixelIcon name="plus" />
       </button>
     </span>
   );

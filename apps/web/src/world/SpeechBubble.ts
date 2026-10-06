@@ -1,9 +1,12 @@
-import { Container, Graphics, Text } from "pixi.js";
+import { Container, Graphics, type Text } from "pixi.js";
 import { ROOM } from "./layout";
+import { pixelText } from "./pixel";
 import type { SpeechBubbleState } from "./worldState";
 
 const MAX_CHARS = 30;
 const INK = 0x1a1c2c;
+/** Between the frame of a bubble and its words. */
+const PADDING = { x: 6, y: 2 };
 
 const FILL: Record<SpeechBubbleState["kind"], number> = {
   speech: 0xffffff,
@@ -26,11 +29,7 @@ export class SpeechBubble extends Container {
 
   constructor(onClick: (eventId: string) => void) {
     super();
-    this.caption = new Text({
-      text: "",
-      style: { fontFamily: "monospace", fontSize: 11, fill: INK },
-      resolution: 3,
-    });
+    this.caption = pixelText("", { fill: INK });
     this.addChild(this.box, this.caption);
     this.eventMode = "static";
     this.cursor = "pointer";
@@ -48,18 +47,16 @@ export class SpeechBubble extends Container {
     if (key !== this.drawnKey) {
       this.drawnKey = key;
       this.caption.text = abbreviate(bubble.text);
-      this.caption.style.fontStyle = bubble.kind === "thought" ? "italic" : "normal";
-      const width = Math.ceil(this.caption.width) + 14;
-      const height = Math.ceil(this.caption.height) + 10;
-      this.caption.position.set(7, 5);
-      this.box
-        .clear()
-        .rect(0, 0, width, height)
-        .fill(FILL[bubble.kind])
-        .stroke({ color: INK, width: 2 })
-        .rect(width / 2 - 3, height, 6, 4)
-        .fill(INK);
-      this.pivot.set(width / 2, height + 4);
+      // Even sizes, so that the middle of the bubble is on a whole pixel.
+      const width = 2 * Math.ceil(this.caption.width / 2) + 2 * PADDING.x;
+      const height = 2 * Math.ceil(this.caption.height / 2) + 2 * PADDING.y;
+      this.caption.position.set(PADDING.x, PADDING.y);
+      const middle = width / 2;
+      this.box.clear().rect(0, 0, width, height).fill(FILL[bubble.kind]).stroke({ color: INK, width: 2 });
+      // Something said has a tail; a thought rises in two small puffs.
+      if (bubble.kind === "thought") this.box.rect(middle - 4, height + 2, 4, 2).rect(middle + 2, height + 4, 2, 2).fill(INK);
+      else this.box.rect(middle - 3, height + 1, 6, 2).rect(middle - 1, height + 3, 2, 2).fill(INK);
+      this.pivot.set(middle, height + 6);
     }
 
     // Keep the whole bubble inside the room, even next to a wall.

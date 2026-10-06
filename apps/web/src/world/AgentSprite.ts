@@ -1,26 +1,30 @@
-import { Container, Graphics, Rectangle, Text } from "pixi.js";
+import { Container, Graphics, Rectangle } from "pixi.js";
+import { ICONS, sizeOf, type IconName } from "../pixel/bitmaps";
 import type { LayoutAgent } from "./layout";
+import { centred, drawIcon, pixelText } from "./pixel";
 import { spriteFor, type SpritePalette } from "./sprites";
+import { statusIcon } from "./statusIcon";
 import type { AgentVisualState } from "./worldState";
 
 const PIXEL = 3;
 const INK = 0x1a1c2c;
 const FRAME_MS = 170;
 const SELECTED = 0xffd166;
-
-const STATUS_ICON: Record<AgentVisualState["status"], string> = {
-  idle: "",
-  thinking: "...",
-  waiting: "zZ",
-  working: "*",
-};
+const ALERT = 0xff5d5d;
+/** World pixels per pixel of a status icon, and the plate it is drawn on. */
+const ICON_SCALE = 2;
+const PLATE_EDGE = 2;
+/** Just clear of the top of the head. */
+const PLATE_BOTTOM = -52;
 
 /** A pixel character on a 12×16 grid, anchored at its feet. */
 export class AgentSprite extends Container {
   private body = new Graphics();
   /** Marks the character the user has picked. */
   private ring = new Graphics().ellipse(0, 1, 20, 8).stroke({ color: SELECTED, width: 2 });
-  private statusIcon: Text;
+  /** What the character is doing, or that it has failed, as an icon on a small plate. */
+  private status = new Graphics();
+  private drawnStatus: IconName | null = null;
   private palette: SpritePalette;
   private drawnKey = "";
 
@@ -29,24 +33,11 @@ export class AgentSprite extends Container {
     this.palette = spriteFor(agent.sprite);
 
     const shadow = new Graphics().ellipse(0, 0, 15, 5).fill({ color: 0x000000, alpha: 0.28 });
-    const label = new Text({
-      text: agent.name,
-      style: { fontFamily: "monospace", fontSize: 11, fontWeight: "bold", fill: 0xffffff, stroke: { color: INK, width: 3, join: "round" } },
-      resolution: 3,
-    });
-    label.anchor.set(0.5, 0);
-    label.y = 5;
-
-    this.statusIcon = new Text({
-      text: "",
-      style: { fontFamily: "monospace", fontSize: 12, fontWeight: "bold", fill: 0xffe066, stroke: { color: INK, width: 3, join: "round" } },
-      resolution: 3,
-    });
-    this.statusIcon.anchor.set(0.5, 1);
-    this.statusIcon.y = -50;
+    const label = pixelText(agent.name, { fill: 0xffffff, outlined: true });
+    label.position.set(centred(label.width), 3);
 
     this.ring.visible = false;
-    this.addChild(shadow, this.ring, this.body, label, this.statusIcon);
+    this.addChild(shadow, this.ring, this.body, label, this.status);
     this.eventMode = "static";
     this.cursor = "pointer";
     this.hitArea = new Rectangle(-20, -52, 40, 72);
@@ -65,10 +56,27 @@ export class AgentSprite extends Container {
       this.draw(state, frame);
     }
 
-    // A speech bubble occupies the same spot above the head.
-    const icon = state.speechBubble ? "" : state.alert ? "!" : STATUS_ICON[state.status];
-    if (this.statusIcon.text !== icon) this.statusIcon.text = icon;
-    this.statusIcon.style.fill = state.alert ? 0xff5d5d : 0xffe066;
+    const icon = statusIcon(state);
+    if (icon !== this.drawnStatus) {
+      this.drawnStatus = icon;
+      this.drawStatus(icon);
+    }
+  }
+
+  private drawStatus(icon: IconName | null): void {
+    const g = this.status.clear();
+    if (!icon) return;
+    const { width, height } = sizeOf(ICONS[icon]);
+    const inset = PLATE_EDGE + ICON_SCALE;
+    const plateWidth = width * ICON_SCALE + 2 * inset;
+    const plateHeight = height * ICON_SCALE + 2 * inset;
+    const x = centred(plateWidth);
+    const y = PLATE_BOTTOM - plateHeight;
+    // An error is a red plate: it has to be seen from across the office.
+    const failed = icon === "error";
+    g.rect(x, y, plateWidth, plateHeight).fill(INK);
+    if (failed) g.rect(x + PLATE_EDGE, y + PLATE_EDGE, plateWidth - 2 * PLATE_EDGE, plateHeight - 2 * PLATE_EDGE).fill(ALERT);
+    drawIcon(g, icon, x + inset, y + inset, ICON_SCALE, failed ? 0xffffff : SELECTED);
   }
 
   private draw(state: AgentVisualState, frame: number): void {

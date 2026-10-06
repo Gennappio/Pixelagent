@@ -2,6 +2,7 @@ import { scriptedSheet, setLine, setLineFor, setLinePerRecipient, setSheet, setS
 import { removeAgent, updateAgent } from "../build/workflowEdits";
 import { relationsOf } from "../protocol/relations";
 import type { Agent, AgentScript, RouterRule } from "../protocol/workflow";
+import { PixelIcon } from "../hud/PixelIcon";
 import { useUiStore } from "../state/uiStore";
 import { useWorkflowStore } from "../state/workflowStore";
 import { SPRITES } from "../world/sprites";
@@ -114,7 +115,7 @@ function RouterRules({ agent, change }: { agent: Agent; change: (patch: Partial<
             value={rule.contains}
             onChange={(event) => setRules(rules.map((other, at) => (at === index ? { ...other, contains: event.target.value } : other)))}
           />
-          <span className="muted">→</span>
+          <span className="muted">to</span>
           <select aria-label="Hand it to" value={rule.to} onChange={(event) => setRules(rules.map((other, at) => (at === index ? { ...other, to: event.target.value } : other)))}>
             {!targets.some((candidate) => candidate.id === rule.to) && <option value={rule.to}>{rule.to || "?"}</option>}
             {targets.map((candidate) => (
@@ -124,7 +125,7 @@ function RouterRules({ agent, change }: { agent: Agent; change: (patch: Partial<
             ))}
           </select>
           <button type="button" className="icon" title="Remove this rule" onClick={() => setRules(rules.filter((_, at) => at !== index))}>
-            ✕
+            <PixelIcon name="close" />
           </button>
         </div>
       ))}

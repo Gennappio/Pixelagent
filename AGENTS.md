@@ -186,14 +186,20 @@ Phase 13  building on the characters: a menu on a character, a table, a station 
           in the character's menu, a sentence finished by picking its target in the
           room, which dims but for what the verb accepts; things dragged about, their
           places saved with the workflow; the inspector keeps the configuration form
+Phase 14  the game interface: an icon bar at the bottom-left, one icon per window, lit
+          while it is open; every window closed until asked for, and remembered; frames,
+          type, icons and palette to the pixel, in two pixel fonts, with no rounded
+          corner, shadow or blur left anywhere; the same fonts and icons in the world,
+          with a status icon over each character's head
 ```
 
-Not done: everything in §38 from Phase 14 on. Revision 3 rewrote the plan from
+Not done: everything in §38 from Phase 15 on. Revision 3 rewrote the plan from
 Phase 11: Phases 11–14 are the changes this revision makes (the three slots and
 the spoken message, the camera, building on the characters, the game
-interface), and the phases of revision 2 follow them, renumbered. Today a
-workflow is built in the office itself, on the characters, with no graph on
-screen; the panels are still the plain ones of Phase 7.
+interface), and the phases of revision 2 follow them, renumbered. With Phase 14
+revision 3 is built, and Milestone 2 (§39) is reached: a workflow is built in
+the office itself, on the characters, with no graph on screen, in an interface
+that is a game's.
 
 The deterministic demo in §34 passes and must keep passing after every phase.
 
@@ -1028,10 +1034,15 @@ speech bubbles follow the camera. Selection (the ring under a character) is
 interface state: it is kept out of `WorldState`, which is derived from events
 only.
 
-Until Phase 14 the windows are the plain panels of Phase 7, under the same
-keys, and the icon bar comes with them. The camera controls are in place since
-Phase 12: the two zoom buttons, with the step the camera rests at between
-them, are at the end of the playback bar and on the thin strip it collapses to.
+As built: the office window is 256 pixels wide at the top-left and the
+inspector 352 at the top-right, each as tall as what is in it; these two are
+what the camera frames the room beside. The log is 448 by 200 at the
+bottom-left and lies over the floor, like a game's message feed: it does not
+move the camera. The two zoom buttons, with the step the camera rests at
+between them, are at the end of the playback bar and on the thin strip it
+folds to, beside the count of events. The log's icon is greyed while no run is
+on screen, and then its key does nothing either: an icon and its key are one
+entry of the same table (`hud/barIcons.ts`, read from `hud/shortcuts.ts`).
 
 ---
 
@@ -1179,6 +1190,24 @@ later          objects in the room as entry points: an archive cabinet that open
                hides what an icon shows.
 ```
 
+What the rules became (`pixel.css`, `pixel/bitmaps.ts`, `world/pixel.ts`):
+
+```text
+palette        the colours the room is drawn with, named once: ink, void, wall, floor,
+               edge, text, accent. A window is a piece of wall with a frame of ink
+type           DotGothic16 at 16 pixels for everything that is read, Silkscreen for titles
+               (16) and for tags and keys (8). Both are bundled with the app. Neither has
+               a bold or an italic, and none is invented: emphasis is a colour
+grid           a line is two screen pixels, and so is the pixel of an icon at its usual
+               size: frames, icons and controls sit on one grid
+icons          rows of "#" and "." in one file, drawn as SVG rectangles in the interface
+               and as PixiJS rectangles in the world: the same picture in both
+the world      the same two fonts, one texel per font pixel, never smoothed; the camera's
+               whole steps do the scaling
+held by a test the stylesheets are read by `pixel.test.ts`: a rounded corner, a shadow, a
+               blur, a line one pixel thick or a font at a size it was not made for fails
+```
+
 ---
 
 # 30. Project Structure
@@ -1208,25 +1237,30 @@ pixel-agents/
                             documents.ts, handoff.ts (a hand-off of any revision, read in one place)
     animation/              VisualEventMapper.ts, visualActions.ts, lanes.ts, EventAnimation.ts,
                             AnimationScheduler.ts
+    pixel/                  bitmaps.ts (every icon as rows of pixels, for the interface and the world)
     world/                  PixelWorld.ts, AgentSprite.ts, DocumentSprite.ts, Furniture.ts (trays, tables),
                             Room.ts, Devices.ts, ToolStation.ts, SpeechBubble.ts, sprites.ts,
-                            Camera.ts (zoom steps, gestures), layout.ts, worldState.ts
+                            Camera.ts (zoom steps, gestures), layout.ts, worldState.ts,
+                            pixel.ts (the fonts and icons the world shares with the interface),
+                            statusIcon.ts (what is shown over a character's head)
     build/                  workflowEdits.ts, scriptEdits.ts (what a scripted agent says and writes),
                             picking.ts (the pending sentence and what it lights), dragMove.ts (where
                             things stand), menuPlacement.ts, BuildOverlay.tsx, ContextMenu.tsx (the
                             menu on a character, a table, a station, the floor), PickingBar.tsx (what
                             is being picked, and the tools with no station yet)
     graph/                  GraphView.tsx (read-only), deriveGraph.ts, nodes.tsx
-    hud/                    panels.ts (state, persistence, insets), shortcuts.ts (the table),
-                            useShortcuts.ts, Panel.tsx, TopBar.tsx, OfficePanel.tsx,
-                            GraphOverlay.tsx, ShortcutHelp.tsx, ZoomControl.tsx (later: IconBar.tsx, Window.tsx,
-                            pixel.css: frames, type, icons)
+    hud/                    panels.ts (which windows are open, persistence, insets), shortcuts.ts (the
+                            table), useShortcuts.ts, barIcons.ts (one icon per window, read from the
+                            shortcut table), IconBar.tsx, Window.tsx, PixelIcon.tsx, TopBar.tsx,
+                            OfficePanel.tsx, GraphOverlay.tsx, ShortcutHelp.tsx, ZoomControl.tsx
     debugger/               ReplayController.ts, Timeline.tsx, PlaybackBar.tsx, TranscriptPanel.tsx, transcript.ts
     inspector/              AgentInspector.tsx, AgentConfigForm.tsx, RelationEditor.tsx (the three slots,
                             shared with the context menu), TableInspector.tsx, DocumentInspector.tsx,
                             documentView.ts, EventInspector.tsx, runtimeView.ts, ...
     state/                  workflowStore.ts, runStore.ts, replayStore.ts, uiStore.ts, cameraStore.ts,
                             actions.ts
+    pixel.css               the chrome: palette, type, frames, controls
+    styles.css              layout and components, made of that chrome
 ```
 
 Create packages only for boundaries that are genuinely shared.
@@ -1292,6 +1326,14 @@ build-mode edits as pure workflow functions
 target picking: what a pending sentence lights is exactly what the edit would accept;
   Esc cancels and leaves the workflow untouched
 camera: zoom steps and fit as pure functions of view, world and insets
+the interface opens with no window open; what is open is remembered; hide all brings
+  back the same ones
+the icon bar: one icon per window, in order, each doing exactly what its key does
+icons: every bitmap a rectangle of drawn and empty pixels, covered exactly once by the
+  rectangles it is drawn with
+the chrome, read from the stylesheets: no rounded corner, no shadow, no blur, lines two
+  pixels thick, each font only at the sizes it was made for, no bold and no italic
+the icon over a character's head: an error first, nothing under a speech bubble
 ```
 
 Example:
@@ -1404,7 +1446,7 @@ it, fork the run. Do not start it before replay and relations are stable.
 
 # 38. Development Order
 
-Phases 1–13 are done (§4). Each phase below ends with `npm test` green and
+Phases 1–14 are done (§4). Each phase below ends with `npm test` green and
 the demo of §34 passing. Do not start a phase before the previous one is
 merged.
 
@@ -1616,7 +1658,7 @@ a station's menu says what the tool is and who has it, and changes nothing: a st
                  stands for as long as someone can use its tool
 ```
 
-## Phase 14 — The game interface
+## Phase 14 — The game interface (done)
 
 ```text
 the icon bar; windows closed by default; the same keys and the same localStorage memory
@@ -1625,6 +1667,46 @@ office, inspector, log, timeline, help and the playback strip restyled; the grap
 status icons over characters' heads; the alert on an error stays in the world
 the layout of §23: icon bar bottom-left, windows beside what they describe
 afterwards, only if it earns its place: the archive cabinet, the bulletin board, the wall clock
+```
+
+Settled while building it, where this document left room:
+
+```text
+the fonts        DotGothic16 for text and Silkscreen for titles, tags and keys (§29), from
+                 npm packages, so nothing is fetched from elsewhere. Chosen by reading a
+                 field table and a transcript in each candidate at body size
+no bold          neither font has one. What was bold is white, or the accent colour
+headings         in lower case in the body font, whose capitals are narrow; only what is
+                 set in the title font is in capitals
+windows          a nine-slice frame from one small inline SVG (`border-image`), a title
+                 bar with the window's key and a close button. Closed, a window is not
+                 in the page at all. As tall as its contents, scrolling inside when the
+                 stage is shorter
+closed           a browser that had panels open before this phase finds them open: the
+                 memory is the same. A new one opens on the world alone
+the log          lies over the bottom-left of the floor and is not counted when the room
+                 is framed: a feed is read at a glance, and should not move the camera
+its key          does nothing without a run, like its greyed icon. Before, L toggled a
+                 log that was not on screen, and it turned up open at the next run
+icons            12 by 12 for windows and tools, 8 by 8 for controls, 7 by 7 for statuses.
+                 A tool's icon is on the sign over its station, with its name, and in the
+                 list of tools while one is picked; a tool with no machine of its own
+                 gets a box with the icon any tool gets
+statuses         a small dark plate over the head: thinking, waiting, working. An error is
+                 a red plate. Under a speech bubble there is none: the bubble has the
+                 spot, and an error's bubble says what the error is
+thoughts         a thought bubble rises in two puffs where speech has a tail. It was
+                 italic, and there is no italic
+the timeline     marks an event with a square
+the graph        is framed at its own size or smaller, never enlarged. React Flow shrinks
+                 it to fit, at any scale, so the graph is the one place where type is
+                 smoothed: unsmoothed, a pixel font drawn at seven tenths cannot be read
+the help         shows keys at the size of the text; elsewhere a key is a small cap
+room objects     the archive cabinet, the bulletin board and the wall clock are not
+                 built. The icon bar says all three already, and nothing asked for them
+worth knowing    a side window narrows what the room is framed in, and the camera only
+                 rests on whole steps: on a screen 1440 wide, opening the office or the
+                 inspector takes the room from 2× to 1×, and closing it brings it back
 ```
 
 ## Phase 15 — Real LLM agent

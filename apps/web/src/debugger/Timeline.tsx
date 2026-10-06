@@ -8,6 +8,8 @@ import { eventStage } from "./ReplayController";
 const STEP = 30;
 const LANE = 30;
 const PAD = 20;
+/** Half the side of the square that marks an event; larger for the one selected. */
+const mark = (selected: boolean) => (selected ? 8 : 6);
 
 export const EVENT_COLOR: Record<AgentEventType, string> = {
   RUN_STARTED: "#9aa4bf",
@@ -87,7 +89,7 @@ export function Timeline() {
         ))}
       </div>
       <div className="timeline-scroll" ref={scroller}>
-        <svg width={width} height={height}>
+        <svg width={width} height={height} shapeRendering="crispEdges">
           <defs>
             <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
               <path d="M0,0 L8,4 L0,8 z" fill="context-stroke" />
@@ -127,9 +129,9 @@ export function Timeline() {
                     markerEnd="url(#arrow)"
                   />
                 )}
-                {link && <rect x={x - 3} y={linkY - 3} width={6} height={6} fill={color} />}
+                {link && <rect x={x - 3} y={linkY - 3} width={6} height={6} fill={color} className="link" />}
                 <rect x={x - STEP / 2} y={y - LANE / 2} width={STEP} height={LANE} fill="transparent" />
-                <circle cx={x} cy={y} r={selected ? 8 : 6} fill={color} className={selected ? "selected" : undefined} />
+                <rect x={x - mark(selected)} y={y - mark(selected)} width={2 * mark(selected)} height={2 * mark(selected)} fill={color} className={selected ? "mark selected" : "mark"} />
               </g>
             );
           })}
