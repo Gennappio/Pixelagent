@@ -100,6 +100,8 @@ class DocumentRegistry:
                         self._move(document, in_hand(actor))
                         self._touch(document, sequence, "picked_up", agent_id=actor)
 
+            # A hand-off is something said, with or without a sheet. Only the sheet is a document:
+            # words alone leave the registry as it was.
             case T.MESSAGE_SENT if document_id and actor:
                 document = self._version(document_id, payload, payload.get("content", ""), actor, sequence, in_hand(actor))
                 self._move(document, in_hand(target or actor))
@@ -155,7 +157,8 @@ class DocumentRegistry:
         """The document, created if new, with this version recorded if it is not already."""
         document = self.documents.get(document_id)
         if document is None:
-            document = Document(id=document_id, place=place)
+            original = payload.get("copyOf")
+            document = Document(id=document_id, place=place, copy_of=original if isinstance(original, str) and original else None)
             self.documents[document_id] = document
             self._enter(document)
         version = _version_of(payload)

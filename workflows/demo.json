@@ -19,7 +19,7 @@
         "provider": "fake",
         "name": "scripted-v1",
         "script": {
-          "message": "Find the latest sales number."
+          "says": "Find the latest sales number."
         }
       },
       "systemPrompt": "Coordinate the task and delegate work.",
@@ -37,7 +37,11 @@
         "provider": "fake",
         "name": "scripted-v1",
         "script": {
-          "message": "Send this result to management: {result}"
+          "says": "Send this to management.",
+          "sheet": {
+            "title": "Sales number",
+            "content": "{result}"
+          }
         }
       },
       "systemPrompt": "Research the request using the available tools and report the findings.",
@@ -53,7 +57,13 @@
       "instances": 1,
       "model": {
         "provider": "fake",
-        "name": "scripted-v1"
+        "name": "scripted-v1",
+        "script": {
+          "sheet": {
+            "title": "Email sent",
+            "content": "{result}"
+          }
+        }
       },
       "systemPrompt": "Deliver results to the right people.",
       "appearance": {

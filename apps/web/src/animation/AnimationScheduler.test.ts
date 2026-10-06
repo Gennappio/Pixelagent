@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AgentEvent } from "../protocol/events";
-import { demoEvents, demoWorkflow, parallelEvents, parallelWorkflow, tablesEvents, tablesWorkflow } from "../testing/demoRun";
+import { demoEvents, demoWorkflow, indexOfEvent, parallelEvents, parallelWorkflow, tablesEvents, tablesWorkflow } from "../testing/demoRun";
 import { buildLayout, type WorldLayout } from "../world/layout";
 import type { WorldState } from "../world/worldState";
 import { AnimationScheduler, LOOKAHEAD } from "./AnimationScheduler";
@@ -49,8 +49,6 @@ function play(events: readonly AgentEvent[], layout: WorldLayout, window: number
   return { frames, start, end };
 }
 
-const indexOf = (events: readonly AgentEvent[], sequence: number) => events.findIndex((event) => event.sequence === sequence);
-
 describe("the settled world does not depend on lanes", () => {
   it.each(RUNS)("%s ends in the plain fold of its log, however many events may overlap", (_name, events, layout) => {
     const expected = worldStateAt(events, events.length, layout);
@@ -97,8 +95,8 @@ describe("the settled world does not depend on lanes", () => {
 
 describe("events on different lanes animate together", () => {
   const trace = play(parallelEvents, parallelLayout, LOOKAHEAD);
-  const lucaCall = indexOf(parallelEvents, 14);
-  const gianniCall = indexOf(parallelEvents, 15);
+  const lucaCall = indexOfEvent(parallelEvents, "TOOL_CALL", "luca");
+  const gianniCall = indexOfEvent(parallelEvents, "TOOL_CALL", "gianni");
 
   it("has Luca and Gianni at their tools at the same time", () => {
     // Not in lockstep: Anna briefs Luca first, so he is a little ahead. But their tool calls
@@ -139,28 +137,43 @@ describe("events on different lanes animate together", () => {
 
   it("lets a recipient react as soon as it is handed the sheet, while the sender walks back", () => {
     const { frames, start } = play(demoEvents, demoLayout, LOOKAHEAD);
-    const sent = indexOf(demoEvents, 4); // Anna → Luca
-    const received = indexOf(demoEvents, 6); // Luca receives
+    const sent = indexOfEvent(demoEvents, "MESSAGE_SENT", "anna"); // Anna → Luca
+    const received = indexOfEvent(demoEvents, "MESSAGE_RECEIVED", "luca"); // Luca receives
     const moment = frames[start[received]];
     expect(moment.active).toContain(sent);
-    expect(moment.state.documents.doc_1).toEqual({ documentId: "doc_1", title: "Message to Luca", version: 1, place: { kind: "hand", agentId: "luca" } });
+    expect(moment.state.documents.doc_input).toEqual({ documentId: "doc_input", title: "Task", version: 1, place: { kind: "hand", agentId: "luca" } });
     expect(moment.state.agents.anna.position).not.toEqual(demoLayout.homes.anna);
     expect(moment.state.agents.anna.animation).toBe("walk");
   });
 
   it("makes the second reporter wait until Marta has taken the first report", () => {
-    const first = indexOf(parallelEvents, 20); // Luca → Marta
-    const second = indexOf(parallelEvents, 22); // Gianni → Marta
+    const first = indexOfEvent(parallelEvents, "MESSAGE_SENT", "luca"); // Luca → Marta, with the sheet he wrote
+    const second = indexOfEvent(parallelEvents, "MESSAGE_SENT", "gianni"); // Gianni → Marta, words only
     expect([parallelEvents[first].targetId, parallelEvents[second].targetId]).toEqual(["marta", "marta"]);
+    expect([parallelEvents[first].payload.documentId, parallelEvents[second].payload.documentId]).toEqual(["doc_2", undefined]);
     const moment = trace.frames[trace.start[second]];
-    expect(moment.state.documents.doc_3.place).toEqual({ kind: "hand", agentId: "marta" });
-    expect(moment.state.documents.doc_3.transit).toBeUndefined();
+    expect(moment.state.documents.doc_2.place).toEqual({ kind: "hand", agentId: "marta" });
+    expect(moment.state.documents.doc_2.transit).toBeUndefined();
     expect(trace.start[second]).toBeGreaterThan(trace.start[first]);
     // ...and nobody talks over anybody.
     for (const frame of trace.frames) {
       const talking = ["luca", "gianni"].filter((id) => frame.state.agents[id].speechBubble?.kind === "speech");
       expect(talking.length).toBeLessThanOrEqual(1);
     }
+  });
+
+  it("keeps Marta listening until Gianni, who hands her nothing, has finished saying it", () => {
+    const told = indexOfEvent(parallelEvents, "MESSAGE_SENT", "gianni"); // Gianni → Marta, words only
+    const heard = indexOfEvent(parallelEvents, "MESSAGE_RECEIVED", "marta", 1); // Marta receives it
+    expect([parallelEvents[heard].type, parallelEvents[heard].actorId, parallelEvents[heard].targetId]).toEqual(["MESSAGE_RECEIVED", "marta", "gianni"]);
+    const speaking = trace.frames.map((frame, at) => (frame.state.agents.gianni.speechBubble?.kind === "speech" ? at : -1)).filter((at) => at >= 0);
+    expect(speaking.length).toBeGreaterThan(10);
+    // She does not turn to what she was told while he is still telling her…
+    expect(trace.start[heard]).toBeGreaterThan(speaking.at(-1)!);
+    // …and does not wait for him to be back at his desk either.
+    const moment = trace.frames[trace.start[heard]];
+    expect(moment.active).toContain(told);
+    expect(moment.state.agents.gianni.position).not.toEqual(parallelLayout.homes.gianni);
   });
 
   it("shows an event that finished ahead of the playhead as finished, not as still to come", () => {
@@ -174,7 +187,7 @@ describe("events on different lanes animate together", () => {
   it("does not show the run finishing while someone it does not involve is still moving", () => {
     // Luca is on his way to a tool when the log says the run is over, with Marta's result.
     // Nothing ties the two together but the run itself, which is the point.
-    const log = [parallelEvents[0], parallelEvents[indexOf(parallelEvents, 14)], parallelEvents.at(-1)!].map((event, index) => ({
+    const log = [parallelEvents[0], parallelEvents[lucaCall], parallelEvents.at(-1)!].map((event, index) => ({
       ...event,
       sequence: index + 1,
     }));
@@ -230,17 +243,20 @@ describe("stepping and live logs", () => {
     const scheduler = new AnimationScheduler();
     scheduler.load(parallelEvents, parallelLayout);
     // The playhead on Luca's tool call, with Gianni's right behind it.
-    scheduler.jumpTo(indexOf(parallelEvents, 14));
+    const luca = indexOfEvent(parallelEvents, "TOOL_CALL", "luca");
+    const gianni = indexOfEvent(parallelEvents, "TOOL_CALL", "gianni");
+    expect(gianni).toBe(luca + 1);
+    scheduler.jumpTo(luca);
     scheduler.launch(1);
-    expect(scheduler.active).toEqual([indexOf(parallelEvents, 14)]);
+    expect(scheduler.active).toEqual([luca]);
     scheduler.launch(LOOKAHEAD);
-    expect(scheduler.active).toEqual([indexOf(parallelEvents, 14), indexOf(parallelEvents, 15)]);
+    expect(scheduler.active).toEqual([luca, gianni]);
   });
 
   it("settleFront finishes the event at the playhead and takes back what ran ahead", () => {
     const scheduler = new AnimationScheduler();
     scheduler.load(parallelEvents, parallelLayout);
-    scheduler.jumpTo(indexOf(parallelEvents, 14));
+    scheduler.jumpTo(indexOfEvent(parallelEvents, "TOOL_CALL", "luca"));
     for (let i = 0; i < 20; i++) scheduler.advance(16, LOOKAHEAD);
     expect(scheduler.active.length).toBeGreaterThan(1);
     const playhead = scheduler.settled;

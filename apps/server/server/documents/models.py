@@ -3,6 +3,10 @@
 A document is never stored on its own. Every version travels inside the event
 that created it, so the event log is the whole truth and the registry in this
 package is only a way of reading it.
+
+A sheet is what an agent writes; a message is what it says. Only the first is a
+document: what is said when something is handed over lives in the MESSAGE_SENT
+event and nowhere else.
 """
 
 from __future__ import annotations
@@ -82,6 +86,8 @@ class Document(CamelModel):
     versions: list[DocumentVersion] = Field(default_factory=list)
     place: DocumentPlace
     history: list[DocumentTouch] = Field(default_factory=list)
+    # A photocopy: the sheet this one was copied from, when one sheet went to several agents.
+    copy_of: str | None = None
 
     @property
     def latest(self) -> DocumentVersion:

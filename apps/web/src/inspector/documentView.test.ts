@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { foldDocuments } from "../protocol/documents";
-import { demoEvents, tablesEvents } from "../testing/demoRun";
+import { demoEvents, everyRun, oldDemoEvents, parallelEvents, tablesEvents } from "../testing/demoRun";
 import { contentText, describePlace, describeTouch, excerpt } from "./documentView";
 
-const names = { anna: "Anna", luca: "Luca", gianni: "Gianni", sorter: "Sorter", stapler: "Stapler", board: "Board", todo: "To research", done: "Researched" };
+const names = { anna: "Anna", luca: "Luca", gianni: "Gianni", marta: "Marta", sorter: "Sorter", stapler: "Stapler", board: "Board", todo: "To research", done: "Researched" };
 
 describe("describePlace", () => {
   it("names every place a sheet can be", () => {
@@ -17,41 +17,75 @@ describe("describePlace", () => {
 });
 
 describe("describeTouch", () => {
-  const history = (events: typeof demoEvents, id: string) =>
-    foldDocuments(events).documents[id].history.map((touch) => `#${touch.sequence} ${describeTouch(touch, names)}`);
+  const history = (events: typeof demoEvents, id: string) => foldDocuments(events).documents[id].history.map((touch) => describeTouch(touch, names));
 
-  it("tells the story of a message sheet", () => {
-    expect(history(demoEvents, "doc_1")).toEqual(["#4 Anna handed it to Luca", "#6 Luca received it from Anna", "#13 Luca filed it"]);
+  it("tells the story of a sheet an agent wrote and handed on", () => {
+    expect(history(demoEvents, "doc_1")).toEqual(["Luca handed it to Gianni", "Gianni received it from Luca", "Gianni filed it"]);
   });
 
-  it("tells the story of the task and of the result", () => {
-    expect(history(demoEvents, "doc_input")).toEqual(["#1 Arrived in the in-tray as the task", "#2 Anna picked it up", "#5 Anna filed it"]);
-    expect(history(demoEvents, "doc_3")).toEqual(["#20 Gianni put it in the out-tray"]);
+  it("tells the story of the task, passed on as it is, and of the result", () => {
+    expect(history(demoEvents, "doc_input")).toEqual([
+      "Arrived in the in-tray as the task",
+      "Anna picked it up",
+      "Anna handed it to Luca",
+      "Luca received it from Anna",
+      "Luca filed it",
+    ]);
+    expect(history(demoEvents, "doc_2")).toEqual(["Gianni put it in the out-tray"]);
+  });
+
+  it("tells the story of a photocopy, and of a sheet rewritten by whoever was handed it", () => {
+    // Anna hands the task to Luca and a photocopy of it to Gianni.
+    expect(history(parallelEvents, "doc_1")).toEqual(["Anna handed it to Gianni", "Gianni received it from Anna", "Gianni filed it"]);
+    // Marta rewrites the sheet Luca handed her: it is filed with her turn, and comes back out as the result.
+    expect(history(parallelEvents, "doc_2")).toEqual(["Luca handed it to Marta", "Marta received it from Luca", "Marta filed it", "Marta put it in the out-tray"]);
+    expect(describeTouch({ action: "handed", agentId: "luca", peerId: "gianni", version: 2 }, names)).toBe("Luca handed version 2 to Gianni");
+    expect(describeTouch({ action: "handed", agentId: "luca", peerId: "gianni", version: 1 }, names)).toBe("Luca handed it to Gianni");
   });
 
   it("tells the story of a sheet rewritten on a shared table", () => {
     expect(history(tablesEvents, "doc_5")).toEqual([
-      "#17 Luca put it on the table “Board”",
-      "#25 Luca put version 2 on the table “Board”",
-      "#35 Gianni read it on the table “Board”",
+      "Luca put it on the table “Board”",
+      "Luca put version 2 on the table “Board”",
+      "Gianni read it on the table “Board”",
     ]);
   });
 
   it("tells the story of a sheet taken from a pile", () => {
-    expect(history(tablesEvents, "doc_2")).toEqual([
-      "#8 Sorter put it on the table “To research”",
-      "#12 Luca took it from the table “To research”",
-      "#18 Luca filed it",
-    ]);
+    expect(history(tablesEvents, "doc_2")).toEqual(["Sorter put it on the table “To research”", "Luca took it from the table “To research”", "Luca filed it"]);
   });
 
   it("tells the story of a sheet a collector gathered and passed on", () => {
-    expect(history(tablesEvents, "doc_4")).toEqual([
-      "#16 Luca put it on the table “Researched”",
-      "#28 Stapler took it from the table “Researched”",
-      "#32 Stapler filed it",
-    ]);
-    expect(history(tablesEvents, "doc_7")).toEqual(["#31 Stapler handed it to Gianni", "#33 Gianni received it from Stapler", "#39 Gianni filed it"]);
+    expect(history(tablesEvents, "doc_4")).toEqual(["Luca put it on the table “Researched”", "Stapler took it from the table “Researched”", "Stapler filed it"]);
+    expect(history(tablesEvents, "doc_7")).toEqual(["Stapler handed it to Gianni", "Gianni received it from Stapler", "Gianni filed it"]);
+  });
+
+  it("tells the story of a sheet from a log of revision 2, made for one hand-off", () => {
+    expect(history(oldDemoEvents, "doc_1")).toEqual(["Anna handed it to Luca", "Luca received it from Anna", "Luca filed it"]);
+    expect(history(oldDemoEvents, "doc_input")).toEqual(["Arrived in the in-tray as the task", "Anna picked it up", "Anna filed it"]);
+  });
+
+  it("points every line of every story at the event it tells of", () => {
+    const told = {
+      created: "RUN_STARTED",
+      picked_up: "AGENT_STARTED",
+      handed: "MESSAGE_SENT",
+      received: "MESSAGE_RECEIVED",
+      filed: "AGENT_FINISHED",
+      written: "DOCUMENT_WRITTEN",
+      read: "DOCUMENT_READ",
+      taken: "DOCUMENT_TAKEN",
+      delivered: "RUN_FINISHED",
+    };
+    for (const { name, events } of everyRun) {
+      const registry = foldDocuments(events);
+      const touches = registry.order.flatMap((id) => registry.documents[id].history);
+      expect(touches.length, name).toBeGreaterThan(5);
+      for (const touch of touches) {
+        const event = events.find((candidate) => candidate.sequence === touch.sequence);
+        expect(event?.type, `${name} #${touch.sequence} ${touch.action}`).toBe(told[touch.action]);
+      }
+    }
   });
 
   it("has a sentence for a result nobody signed", () => {

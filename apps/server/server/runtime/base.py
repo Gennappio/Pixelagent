@@ -32,7 +32,7 @@ class Deadlock(AgentRuntimeError):
 
 
 class NoResult(AgentRuntimeError):
-    """Nothing can happen any more, and the exit agent never produced a result."""
+    """Nothing can happen any more, and the exit agent never produced a sheet: there is no result."""
 
 
 class AgentRuntime(ABC):

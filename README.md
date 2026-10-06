@@ -25,45 +25,57 @@ npm run dev:web      # terminal 2 — UI on http://localhost:5173
 ```
 
 Open http://localhost:5173 and press **▶ RUN**. The seeded *Sales report demo* needs no
-API keys: Anna briefs Luca, Luca walks to the computer and searches, hands the result
-to Gianni, Gianni sends the email. Afterwards, replay it: pause, step event by event,
-scrub, change speed, and click any character, speech bubble, timeline dot or log line
-to see the event behind it.
+API keys: Anna tells Luca what to find and hands him the task, Luca walks to the computer
+and searches, writes the number on a sheet and hands it to Gianni, Gianni sends the
+email. Afterwards, replay it: pause, step event by event, scrub, change speed, and click
+any character, sheet, speech bubble, timeline dot or log line to see what is behind it.
 
 Two more workflows are in the list, also with no API keys:
 
 - **Supplier board**: Anna names two suppliers, a splitter puts one sheet each on a pile,
-  Luca works through the pile and keeps a shared board up to date, a collector gathers
-  what is done and Gianni sends it.
-- **Two desks**: Anna hands out two jobs, Luca and Gianni do them at the same time, and
-  Marta waits for both before delivering.
+  Luca works through the pile, with the search consulted first for every sheet, and keeps
+  a shared board up to date, a collector gathers what is done and Gianni sends it.
+- **Two desks**: Anna hands the task to Luca and a photocopy of it to Gianni, with a
+  line for each. They work at the same time. Luca hands Marta a sheet, Gianni only tells
+  her something, and Marta, who waits for both, rewrites Luca's sheet as the result.
 
 ## Building a workflow
 
 A workflow is an office: agents, tables, and what each agent does, said one sentence at
-a time. Add agents and tables in the Office panel (`+`). Select an agent, and under
-*What it does* pick a verb and what it applies to:
+a time. Add agents and tables in the Office panel (`+`), then select an agent. An agent
+is one task with three slots, and under *What it does* each slot takes its sentences:
 
-| Sentence | What happens |
-|---|---|
-| Anna **is the entry** | She receives the task of the run. |
-| Anna **hands a sheet to** Luca | When her turn ends, her output goes to Luca. |
-| Marta **waits for** Luca | She starts only with a sheet from everyone she waits for. |
-| Luca **can use** Web Search | The tool is available during his turn, and gets a station. |
-| Gianni **reads** Board | He reads what is on that shared table when his turn starts. |
-| Luca **writes on** Board | His output is left on the table: a new version each time. |
-| Luca **takes from** To research | He takes one sheet per turn from that pile. |
-| Gianni **is the exit** | His last output is the result of the run. |
+| Slot | Sentence | What happens |
+|---|---|---|
+| Arrives | Anna **is the entry** | She receives the task of the run, as her first sheet. |
+| | Marta **waits for** Luca | She starts only once everyone she waits for has handed her something. |
+| | Luca **takes from** To research | He takes one sheet per turn from that pile. |
+| Consults | Gianni **reads** Board | What is on that shared table is put in front of him before he thinks. |
+| | Luca **can use** Web Search | The tool is his to call while he works, if he chooses. It gets a station. |
+| | Luca **consults first** Web Search | The tool is called for him, with what arrived, before he thinks. He does not decide. |
+| Goes out | Anna **hands to** Luca | When her turn ends she says something to Luca and hands over her sheet, if she has one. |
+| | Luca **writes on** Board | His sheet is left on the table: same title, new version. |
+| | Gianni **is the exit** | The last sheet he produces is the result of the run. |
 
-Handing over and writing can be left to the agent with *if it chooses*. There are no
-if, while or for blocks: an agent loops inside its own turn, a hand-off that leads back
+What others hand to an agent is listed, greyed, among what arrives for it, and is changed
+on the sender. Handing over and writing happen *always* or *if it chooses*. Only a tool
+with a single text argument can be consulted first; the others can only be used.
+
+A hand-off is something said plus at most one sheet. What is said is the instruction,
+and lives in the event; the sheet is the context, has an id and versions, and is the
+paper you see change hands. Each turn an agent produces at most one sheet: a new one, a
+new version of one it holds (when it writes under that sheet's title), or one it holds,
+passed on as it is. Handed to several agents, it is photocopied from the second on.
+
+There are no steps inside an agent and no if, while or for blocks: a sequence is a chain
+of agents, an agent loops over its tools inside its own turn, a hand-off that leads back
 round repeats (five times unless you say otherwise), and work on many items is a pile.
 The graph (`G`) is drawn from these sentences and cannot be edited.
 
-Besides the scripted stand-in for an LLM, three agents follow a rule instead of asking a
-model: a **router** hands the sheet to whoever its rules name, a **splitter** writes one
-sheet per line on a pile, a **collector** waits for the office to go quiet and gathers a
-whole pile into one sheet.
+Besides the scripted stand-in for an LLM, which says and writes what you script, three
+agents follow a rule instead of asking a model: a **router** hands the sheet it holds on
+as it is to whoever its rules name, a **splitter** writes one sheet per line on a pile, a
+**collector** waits for the office to go quiet and gathers a whole pile into one sheet.
 
 ## The screen
 
@@ -110,13 +122,14 @@ apps/server/server/
   websocket/   live event fan-out
   main.py      FastAPI app
 apps/web/src/
-  protocol/    wire types (mirror of the server models) and the document fold
+  protocol/    wire types (mirror of the server models), the verbs and their three slots,
+               the document fold, and the one reader of hand-offs old and new
   animation/   VisualEventMapper (event → visual actions), lanes, AnimationScheduler
   world/       PixiJS renderer, camera, world state, layout, placeholder sprites
   hud/         the shell: collapsible panels, top bar, shortcuts, graph overlay
   debugger/    ReplayController, timeline, playback bar, transcript
   inspector/   agent / event / tool inspectors
-  build/       pure edits of a workflow: agents, tables, sentences
+  build/       pure edits of a workflow: agents, tables, sentences, scripts
   graph/       the workflow as a graph, derived from its relations (XYFlow, read-only)
   state/       stores, and the actions the bar, panels and shortcuts share
 ```
@@ -137,12 +150,16 @@ apps/web/src/
   station, table and sheet is a lane; events on different lanes animate at the same time,
   events on the same lane keep their order. Stepping is always one event at a time. Where
   things end up never depends on this: it is the plain fold of the log.
-- **What agents pass around is a sheet.** The task, every message and the result are
-  documents with an id and versions. They travel inside the events and nowhere else, so
-  a saved run contains every sheet and every version of it. In the world a sheet sits in
-  the in-tray, in someone's hands, on a table or in the out-tray, and can be clicked
-  like anything else; sheets an agent is done with are filed, out of sight but listed
-  under Sheets in the Office panel.
+- **What agents pass around is a sheet; what they say is a message.** The task, what an
+  agent writes and the result are documents with an id and versions. They travel inside
+  the events and nowhere else, so a saved run contains every sheet and every version of
+  it. What is said at a hand-off is in the event too, and is not a document. In the
+  world a sheet sits in the in-tray, in someone's hands, on a table or in the out-tray,
+  and can be clicked like anything else; sheets an agent is done with are filed, out of
+  sight but listed under Sheets in the Office panel.
+- **Old logs keep working.** A run saved before hand-offs had words of their own, when
+  every hand-off was a sheet made for the occasion, opens and replays as it did:
+  `tests/fixtures/revision2/` holds such logs, and both test suites fold and play them.
 - **Everything is saved.** Each workflow is a file, `workflows/<id>.json`: **Save** in the
   UI writes it, and a file you add or edit by hand shows up after a page reload. Each run stores a snapshot of the workflow it executed plus its full event
   log; every `AGENT_FINISHED` event carries that agent's context at hand-off. A run can be
@@ -161,6 +178,9 @@ GET  /runs/{id}/events     GET  /runs/{id}/export
 WS   /runs/{id}/stream
 ```
 
+`GET /tools` lists each tool with its argument schema and `consultable`: whether an agent
+can consult it first.
+
 Server settings (environment): `PIXELAGENTS_WORKFLOWS` (workflow folder, default
 `workflows/`), `PIXELAGENTS_DB` (SQLite path for runs and events, default
 `apps/server/data/pixelagents.db`), `PIXELAGENTS_PACE` (seconds between runtime steps,
@@ -169,9 +189,9 @@ agents may work at the same time, default `4`).
 
 ## Status
 
-Phases 1–10 of AGENTS.md §38 are in place: event protocol, pixel world, event →
-animation, replay, the world-first shell, documents, animation lanes, and workflows as
-relations run by the office runtime.
+Phases 1–11 of AGENTS.md §38 are in place: event protocol, pixel world, event →
+animation, replay, the world-first shell, documents, animation lanes, workflows as
+relations run by the office runtime, and the three slots with the spoken message.
 
 AGENTS.md revision 2 (2026-10-05) set the direction: the pixel world is the primary
 GUI and becomes the editor, the graph a derived read-only view, and the workflow a list
@@ -179,7 +199,9 @@ of relations ("Anna sends_to Luca") over agents, tools, documents, tables and ro
 Revision 3 (2026-10-06), after the first hands-on use, fixes what a character is (one
 task with three slots: what arrives, what it consults, where its sheet goes), splits a
 hand-off into a spoken message and a sheet, and moves building onto the characters
-themselves, with a game's interface and a camera that zooms. Next up is Phase 11 (the
-three slots and the spoken message, in the runtime and the protocol); see AGENTS.md §38
-for the plan. Workflows saved before relations existed, and runs exported then, still
-open: they are read as relations, and a file is rewritten only when saved.
+themselves, with a game's interface and a camera that zooms. The first of these, the
+model, is built (Phase 11). Next up is Phase 12 (the camera: zoom steps, pinch and
+Ctrl+wheel to zoom, wheel to pan), then building on the characters and the game
+interface; see AGENTS.md §38 for the plan. Workflows saved before relations existed, and
+runs exported before hand-offs had words, still open: they are read as they are, and a
+file is rewritten only when saved.

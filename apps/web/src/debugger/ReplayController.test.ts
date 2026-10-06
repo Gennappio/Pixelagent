@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { worldStateAt } from "../animation/EventAnimation";
-import { demoEvents, demoWorkflow, parallelEvents, parallelWorkflow } from "../testing/demoRun";
+import { demoEvents, demoWorkflow, indexOfEvent, parallelEvents, parallelWorkflow, sequenceOf } from "../testing/demoRun";
 import { buildLayout } from "../world/layout";
 import { initialWorldState, STATION_DISTANCE } from "../world/worldState";
 import { adjacentSpeed, eventStage, ReplayController, SPEEDS, type ReplaySnapshot } from "./ReplayController";
@@ -128,13 +128,13 @@ describe("ReplayController", () => {
   });
 
   it("seek() lands on the state right after that sequence", () => {
-    controller.seek(9); // TOOL_CALL: Luca is at the computer
+    controller.seek(sequenceOf(demoEvents, "TOOL_CALL", "luca")); // Luca is at the computer
     const luca = controller.worldState.agents.luca;
     expect(luca.animation).toBe("working");
     expect(luca.position).toEqual({ x: layout.stations.web_search.x, y: layout.stations.web_search.y + STATION_DISTANCE });
     expect(controller.worldState.stations.web_search).toMatchObject({ active: true, userId: "luca" });
 
-    controller.seek(13);
+    controller.seek(sequenceOf(demoEvents, "AGENT_FINISHED", "luca"));
     expect(controller.worldState.agents.luca.position).toEqual(layout.homes.luca);
     expect(controller.worldState.stations.web_search.active).toBe(false);
   });
@@ -332,10 +332,11 @@ describe("where the camera should look", () => {
   });
 
   it("is the agent of the event being stepped, and moves with it", () => {
-    controller.seek(3);
-    controller.next(); // event 4: Anna walks over to Luca
+    const handOff = indexOfEvent(demoEvents, "MESSAGE_SENT", "anna");
+    controller.seek(handOff);
+    controller.next(); // Anna walks over to Luca
     const before = controller.focus!;
-    expect(before.key).toBe(demoEvents[3].id);
+    expect(before.key).toBe(demoEvents[handOff].id);
     expect(before.position).toEqual(layout.homes.anna);
     for (let i = 0; i < 20; i++) controller.tick(FRAME);
     expect(controller.focus!.key).toBe(before.key);
@@ -343,8 +344,9 @@ describe("where the camera should look", () => {
   });
 
   it("is the agent of the event at the playhead when stopped there", () => {
-    controller.seek(9); // Luca at the computer
-    expect(controller.focus).toEqual({ key: demoEvents[8].id, position: controller.worldState.agents.luca.position });
+    const call = indexOfEvent(demoEvents, "TOOL_CALL", "luca");
+    controller.seek(call + 1); // Luca at the computer
+    expect(controller.focus).toEqual({ key: demoEvents[call].id, position: controller.worldState.agents.luca.position });
     expect(controller.focus!.position).not.toEqual(layout.homes.luca);
   });
 

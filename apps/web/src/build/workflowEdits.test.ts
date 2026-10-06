@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { entryOf, sentence } from "../protocol/relations";
-import type { Workflow } from "../protocol/workflow";
+import type { ToolDescription, Workflow } from "../protocol/workflow";
 import { demoWorkflow, tablesWorkflow } from "../testing/demoRun";
 import {
   addAgent,
@@ -18,7 +18,12 @@ import {
   updateTable,
 } from "./workflowEdits";
 
-const TOOLS = ["web_search", "send_email", "calculator"];
+/** The server's three tools, as GET /tools lists them. */
+const TOOLS: ToolDescription[] = [
+  { name: "web_search", description: "", schema: {}, consultable: true },
+  { name: "send_email", description: "", schema: {}, consultable: false },
+  { name: "calculator", description: "", schema: {}, consultable: true },
+];
 const say = (workflow: Workflow) => workflow.relations.map((relation) => sentence(workflow, relation));
 
 describe("agents", () => {
@@ -54,7 +59,7 @@ describe("agents", () => {
 describe("sentences", () => {
   it("adds a sentence after the ones the agent already has", () => {
     const more = addRelation(demoWorkflow, "anna", "uses_tool", "calculator");
-    expect(say(more).slice(0, 3)).toEqual(["Anna is the entry", "Anna hands a sheet to Luca", "Anna can use calculator"]);
+    expect(say(more).slice(0, 3)).toEqual(["Anna is the entry", "Anna hands to Luca", "Anna can use calculator"]);
     expect(more.relations[2].id).toBe("r7");
     expect(say(addRelation(emptyAnd("solo"), "solo", "is_entry"))).toEqual(["Solo is the entry"]);
   });
@@ -81,9 +86,15 @@ describe("sentences", () => {
   });
 
   it("offers only what a sentence could still end with", () => {
-    const ids = (verb: Parameters<typeof objectChoices>[2], subject = "luca") => objectChoices(tablesWorkflow, subject, verb, TOOLS).map((choice) => choice.id);
+    const ids = (verb: Parameters<typeof objectChoices>[2], subject = "luca", required?: boolean) =>
+      objectChoices(tablesWorkflow, subject, verb, { tools: TOOLS, required }).map((choice) => choice.id);
     expect(ids("sends_to")).toEqual(["anna", "sorter", "stapler", "gianni"]);
     expect(ids("uses_tool")).toEqual(["send_email", "calculator"]); // already has web_search
+    // To consult first, only tools that can be: the email needs more than one argument.
+    expect(ids("uses_tool", "luca", true)).toEqual(["calculator"]);
+    expect(ids("uses_tool", "anna", true)).toEqual(["web_search", "calculator"]);
+    // Which tools exist is the server's knowledge: without its list there are none to offer.
+    expect(objectChoices(tablesWorkflow, "luca", "uses_tool")).toEqual([]);
     expect(ids("takes_from_table")).toEqual(["done"]); // piles only, minus the one it takes from
     expect(ids("reads_table")).toEqual(["board"]); // shared tables only
     expect(ids("writes_table")).toEqual(["todo"]); // it already writes on the other two
@@ -102,20 +113,70 @@ describe("sentences", () => {
     expect(back.relations[1]).toEqual(demoWorkflow.relations[1]);
   });
 
-  it("does not let a verb that always happens be marked as a choice", () => {
-    expect(updateRelation(demoWorkflow, "r3", { required: false }).relations[2]).toEqual(demoWorkflow.relations[2]);
+  it("does not mark as a choice a verb that is not one", () => {
+    const waiting = addRelation(demoWorkflow, "gianni", "waits_for", "luca");
+    const id = waiting.relations.find((relation) => relation.verb === "waits_for")!.id;
+    expect(updateRelation(waiting, id, { required: false }).relations).toEqual(waiting.relations);
+    expect(updateRelation(demoWorkflow, "r1", { required: false }).relations[0]).toEqual(demoWorkflow.relations[0]);
+    expect(updateRelation(demoWorkflow, "nope", { required: false })).toBe(demoWorkflow);
   });
 
-  it("reorders a sentence among the same agent's, leaving the others where they are", () => {
-    const extra = addRelation(addRelation(demoWorkflow, "anna", "sends_to", "gianni"), "anna", "uses_tool", "calculator");
+  it("switches a tool between one the agent can use and one it consults first", () => {
+    // r3: Luca can use web_search, which takes one text argument.
+    const first = updateRelation(demoWorkflow, "r3", { required: true }, TOOLS);
+    expect(first.relations[2]).toEqual({ id: "r3", subject: "luca", verb: "uses_tool", object: "web_search", required: true });
+    expect(say(first)).toContain("Luca consults first web_search");
+    // Back to the default, which is left unsaid.
+    expect(updateRelation(first, "r3", { required: false }, TOOLS).relations[2]).toEqual(demoWorkflow.relations[2]);
+    expect(updateRelation(demoWorkflow, "r3", { required: false }, TOOLS).relations[2]).toEqual(demoWorkflow.relations[2]);
+  });
+
+  it("refuses to have a tool consulted first that cannot be, as the server would at run time", () => {
+    // r5: Gianni can use send_email, which needs a recipient and a body.
+    expect(updateRelation(demoWorkflow, "r5", { required: true }, TOOLS)).toBe(demoWorkflow);
+    // Without the server's list no tool is known to be consultable.
+    expect(updateRelation(demoWorkflow, "r3", { required: true })).toBe(demoWorkflow);
+    expect(canRelate(demoWorkflow, "anna", "uses_tool", "send_email", { required: true, tools: TOOLS })).toBe(false);
+    expect(canRelate(demoWorkflow, "anna", "uses_tool", "send_email", { tools: TOOLS })).toBe(true);
+    expect(canRelate(demoWorkflow, "anna", "uses_tool", "calculator", { required: true, tools: TOOLS })).toBe(true);
+    expect(canRelate(demoWorkflow, "anna", "uses_tool", "calculator", { required: true })).toBe(false);
+    expect(addRelation(demoWorkflow, "anna", "uses_tool", "send_email", { required: true, tools: TOOLS })).toBe(demoWorkflow);
+    // One that already is, from a file say, can still be switched back.
+    const odd: Workflow = { ...demoWorkflow, relations: demoWorkflow.relations.map((relation) => (relation.id === "r5" ? { ...relation, required: true } : relation)) };
+    expect(updateRelation(odd, "r5", { required: false }, TOOLS).relations[4]).toEqual(demoWorkflow.relations[4]);
+  });
+
+  it("adds a sentence the way it is said, leaving the verb's default unsaid", () => {
+    const added = (verb: Parameters<typeof addRelation>[2], object: string, required?: boolean) => {
+      const next = addRelation(demoWorkflow, "anna", verb, object, { required, tools: TOOLS });
+      return next.relations.find((relation) => relation.id === "r7");
+    };
+    expect(added("uses_tool", "calculator", true)).toEqual({ id: "r7", subject: "anna", verb: "uses_tool", object: "calculator", required: true });
+    expect(added("uses_tool", "calculator", false)).toEqual({ id: "r7", subject: "anna", verb: "uses_tool", object: "calculator" });
+    expect(added("sends_to", "gianni", false)).toEqual({ id: "r7", subject: "anna", verb: "sends_to", object: "gianni", required: false });
+    expect(added("sends_to", "gianni", true)).toEqual({ id: "r7", subject: "anna", verb: "sends_to", object: "gianni" });
+    // On a verb that is not a choice, `required` is not said at all.
+    expect(added("waits_for", "gianni", false)).toEqual({ id: "r7", subject: "anna", verb: "waits_for", object: "gianni" });
+  });
+
+  it("reorders a sentence within its slot, leaving the other slots and the other agents where they are", () => {
+    const extra = addRelation(addRelation(addRelation(demoWorkflow, "anna", "sends_to", "gianni"), "anna", "uses_tool", "calculator"), "anna", "uses_tool", "web_search");
     const order = (workflow: Workflow) => workflow.relations.filter((relation) => relation.subject === "anna").map((relation) => relation.verb + (relation.object ?? ""));
-    expect(order(extra)).toEqual(["is_entry", "sends_toluca", "sends_togianni", "uses_toolcalculator"]);
-    const moved = moveRelation(extra, extra.relations[2].id, -1);
-    expect(order(moved)).toEqual(["is_entry", "sends_togianni", "sends_toluca", "uses_toolcalculator"]);
+    expect(order(extra)).toEqual(["is_entry", "sends_toluca", "sends_togianni", "uses_toolcalculator", "uses_toolweb_search"]);
+    const gianni = extra.relations.find((relation) => relation.subject === "anna" && relation.object === "gianni")!;
+    const moved = moveRelation(extra, gianni.id, -1);
+    expect(order(moved)).toEqual(["is_entry", "sends_togianni", "sends_toluca", "uses_toolcalculator", "uses_toolweb_search"]);
     expect(moved.relations.filter((relation) => relation.subject !== "anna")).toEqual(extra.relations.filter((relation) => relation.subject !== "anna"));
-    // The first cannot go earlier, the last cannot go later.
+    // The last of what goes out cannot go later: what comes after it is in another slot.
+    expect(moveRelation(extra, gianni.id, 1)).toBe(extra);
+    // Nor can the first of what it consults go earlier, past what goes out.
+    const calculator = extra.relations.find((relation) => relation.object === "calculator")!;
+    expect(moveRelation(extra, calculator.id, -1)).toBe(extra);
+    expect(order(moveRelation(extra, calculator.id, 1))).toEqual(["is_entry", "sends_toluca", "sends_togianni", "uses_toolweb_search", "uses_toolcalculator"]);
+    // Being the entry is alone in its slot.
     expect(moveRelation(extra, "r1", -1)).toBe(extra);
-    expect(moveRelation(extra, extra.relations[3].id, 1)).toBe(extra);
+    expect(moveRelation(extra, "r1", 1)).toBe(extra);
+    expect(moveRelation(extra, "nope", 1)).toBe(extra);
   });
 });
 

@@ -39,6 +39,34 @@ def test_a_relation_on_the_wire_says_only_what_is_not_the_default():
     ]
 
 
+def test_each_verb_has_its_own_default_for_required():
+    # Handing over and writing happen unless left to the agent; a tool is the agent's to call unless it is consulted first.
+    said = [
+        ("anna", "sends_to", "luca", {"required": True}),
+        ("anna", "writes_table", "board", {"required": True}),
+        ("anna", "uses_tool", "web_search", {"required": False}),
+        ("luca", "sends_to", "anna", {"required": False}),
+        ("luca", "writes_table", "board", {"required": False}),
+        ("luca", "uses_tool", "web_search", {"required": True}),
+    ]
+    workflow = office(["anna", "luca"], said, tables=[{"id": "board"}])
+    assert [relation.required for relation in workflow.relations] == [True, True, False, False, False, True]
+    assert [relation.get("required") for relation in workflow.to_wire()["relations"]] == [None, None, None, False, False, True]
+    unsaid = office(["anna", "luca"], [sentence[:3] for sentence in said[:3]], tables=[{"id": "board"}])
+    assert [relation.required for relation in unsaid.relations] == [True, True, False]
+    assert Workflow.model_validate(workflow.to_wire()) == workflow
+
+
+def test_required_means_nothing_on_the_verbs_that_are_not_a_choice():
+    workflow = office(
+        ["anna", "luca"],
+        [("anna", "is_entry", None, {"required": False}), ("anna", "waits_for", "luca", {"required": False}), ("anna", "reads_table", "board", {"required": False})],
+        tables=[{"id": "board"}],
+    )
+    assert all(relation.required for relation in workflow.relations)
+    assert all("required" not in relation for relation in workflow.to_wire()["relations"])
+
+
 def test_a_workflow_round_trips_through_its_wire_form():
     for workflow in (demo_workflow(), edit(tables=[{"id": "board", "name": "Board"}, {"id": "todo", "mode": "pile", "scope": "global"}])):
         assert Workflow.model_validate(workflow.to_wire()) == workflow
@@ -86,8 +114,6 @@ def test_a_malformed_workflow_is_rejected(changes, problem):
         (("anna", "reads_table", "luca"), "object 'luca' is not a table"),
         (("anna", "takes_from_table", "board"), "only be taken from a pile"),
         (("anna", "reads_table", "todo"), "a pile is taken from, not read"),
-        (("anna", "uses_tool", "web_search", {"required": False}), "cannot be optional"),
-        (("anna", "waits_for", "luca", {"required": False}), "cannot be optional"),
         (("anna", "sends_to", "luca", {"maxRounds": 0}), "max_rounds|maxRounds"),
         (("anna", "teleports_to", "luca"), "verb"),
     ],
@@ -125,7 +151,7 @@ def test_the_office_answers_who_does_what_in_declaration_order():
         [
             ("luca", "uses_tool", "web_search"),
             ("anna", "is_entry"),
-            ("luca", "uses_tool", "calculator"),
+            ("luca", "uses_tool", "calculator", {"required": True}),
             ("luca", "waits_for", "anna"),
             ("anna", "sends_to", "luca"),
             ("luca", "is_exit"),
@@ -134,11 +160,35 @@ def test_the_office_answers_who_does_what_in_declaration_order():
     view = Office(workflow)
     assert (view.entry.id, view.exit.id) == ("anna", "luca")
     assert view.tools("luca") == ["web_search", "calculator"]
+    assert view.optional_tools("luca") == ["web_search"]
     assert view.waits_for("luca") == ["anna"]
     # Agents come in the order they first speak, then the ones that never do.
     assert [a.id for a in view.agents] == ["luca", "anna", "gianni"]
-    assert view.sentence(workflow.relations[4]) == "Anna hands a sheet to Luca"
+    assert view.sentence(workflow.relations[4]) == "Anna hands to Luca"
     assert view.sentence(workflow.relations[1]) == "Anna is the entry"
+    # A tool reads differently when the agent does not choose it.
+    assert view.sentence(workflow.relations[0]) == "Luca can use web_search"
+    assert view.sentence(workflow.relations[2]) == "Luca consults first calculator"
+
+
+def test_what_an_agent_consults_and_where_its_sheet_goes_follow_the_order_of_its_sentences():
+    workflow = office(
+        ["anna", "luca"],
+        [
+            ("anna", "uses_tool", "calculator", {"required": True}),
+            ("anna", "writes_table", "board"),
+            ("anna", "uses_tool", "send_email"),
+            ("anna", "reads_table", "board"),
+            ("anna", "sends_to", "luca", {"required": False}),
+            ("anna", "uses_tool", "web_search", {"required": True, "order": 1}),
+            ("anna", "writes_table", "notes", {"order": 1}),
+        ],
+        tables=[{"id": "board"}, {"id": "notes"}],
+    )
+    view = Office(workflow)
+    # A tool the agent may use is not consulted: it is not in this list at all.
+    assert [(r.verb.value, r.object) for r in view.consults("anna")] == [("uses_tool", "web_search"), ("uses_tool", "calculator"), ("reads_table", "board")]
+    assert [(r.verb.value, r.object) for r in view.outputs("anna")] == [("writes_table", "notes"), ("writes_table", "board"), ("sends_to", "luca")]
 
 
 def test_a_relation_closes_a_cycle_when_sheets_can_come_back_round():

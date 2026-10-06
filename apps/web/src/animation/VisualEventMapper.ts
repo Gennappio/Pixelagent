@@ -1,5 +1,6 @@
 import type { VisiblePlace } from "../protocol/documents";
 import { text, type AgentEvent } from "../protocol/events";
+import { handOff } from "../protocol/handoff";
 import type { VisualAction } from "./visualActions";
 
 // Visualization time (ms at 1x). Unrelated to how long execution actually took.
@@ -72,22 +73,20 @@ export function mapEventToActions(event: AgentEvent): VisualAction[] {
     case "MESSAGE_SENT": {
       if (!actor) return [];
       const target = event.targetId;
+      const { line } = handOff(event);
       const actions: VisualAction[] = [];
-      // The message is a sheet: written, carried over, and handed to the other agent.
+      // A hand-off is something said, with or without a sheet. With one, the sheet is in the
+      // sender's hand (just written, or held all along), carried over and handed to the other.
       if (sheet) actions.push({ type: "SHOW_DOCUMENT", ...sheet, at: hand(actor) });
       if (target) actions.push({ type: "MOVE_TO", agentId: actor, target: { kind: "agent", id: target } });
-      actions.push(
-        { type: "TALK", agentId: actor },
-        {
-          type: "SHOW_BUBBLE",
-          agentId: actor,
-          text: text(event, "content"),
-          kind: "speech",
-          eventId: event.id,
-          holdMs: SPEECH_HOLD,
-        },
-        { type: "HIDE_BUBBLE", agentId: actor },
-      );
+      // The bubble shows what was said; when nothing was, what the sheet is called.
+      if (line) {
+        actions.push(
+          { type: "TALK", agentId: actor },
+          { type: "SHOW_BUBBLE", agentId: actor, text: line, kind: "speech", eventId: event.id, holdMs: SPEECH_HOLD, ...(target ? { listenerId: target } : {}) },
+          { type: "HIDE_BUBBLE", agentId: actor },
+        );
+      }
       if (sheet && target) actions.push({ type: "HAND_DOCUMENT", documentId: sheet.documentId, to: hand(target) });
       actions.push({ type: "SET_STATUS", agentId: actor, status: "waiting" }, { type: "RETURN_TO_POSITION", agentId: actor });
       return actions;
@@ -95,6 +94,8 @@ export function mapEventToActions(event: AgentEvent): VisualAction[] {
 
     case "TOOL_CALL": {
       if (!actor) return [];
+      // A tool the runtime consulted for the agent animates like one the agent chose: only
+      // the thought before it is missing, because there was no decision.
       const tool = text(event, "tool");
       return [
         { type: "MOVE_TO", agentId: actor, target: { kind: "station", id: tool } },

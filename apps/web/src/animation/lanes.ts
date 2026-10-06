@@ -38,9 +38,12 @@ export function lanesOfAction(action: VisualAction): string[] {
     case "MOVE_TO":
       // The walker, and who or what it walks up to: its position is read to get there.
       return [agent(action.agentId), action.target.kind === "agent" ? agent(action.target.id) : `${action.target.kind}:${action.target.id}`];
+    case "SHOW_BUBBLE":
+      // Whoever is spoken to listens until it has been said: with nothing handed over,
+      // this is all that keeps them from turning away mid-sentence.
+      return action.listenerId ? [agent(action.agentId), agent(action.listenerId)] : [agent(action.agentId)];
     case "RETURN_TO_POSITION":
     case "TALK":
-    case "SHOW_BUBBLE":
     case "HIDE_BUBBLE":
     case "WORK":
     case "SET_STATUS":

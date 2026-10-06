@@ -1,4 +1,4 @@
-import { entryOf, exitOf, isRequired, toolsInUse, verbInfo } from "../protocol/relations";
+import { entryOf, exitOf, isRequired, phraseOf, toolsInUse, verbInfo } from "../protocol/relations";
 import type { Position, Verb, Workflow } from "../protocol/workflow";
 
 // The workflow as a node graph. Nothing here is stored: the graph is worked out from the
@@ -80,7 +80,7 @@ export function deriveGraph(workflow: Workflow): DerivedGraph {
   for (const relation of workflow.relations) {
     const info = verbInfo(relation.verb);
     const subject = agentNode(relation.subject);
-    const edge = { id: relation.id, verb: relation.verb, label: info.phrase, optional: !isRequired(relation) };
+    const edge = { id: relation.id, verb: relation.verb, label: phraseOf(relation), optional: !isRequired(relation) };
     if (relation.verb === "is_entry") edges.push({ ...edge, source: "start", target: subject, label: "" });
     else if (relation.verb === "is_exit") edges.push({ ...edge, source: subject, target: "end", label: "" });
     else if (!relation.object) continue;

@@ -2,13 +2,14 @@ import { useMemo, useState } from "react";
 import { EVENT_COLOR } from "../debugger/Timeline";
 import { documentsTouchedBy, foldDocuments, latestVersion } from "../protocol/documents";
 import type { AgentEvent } from "../protocol/events";
-import { relationsOf, sentence } from "../protocol/relations";
+import { scriptedSheet, sheetMode } from "../build/scriptEdits";
 import type { Agent, Workflow } from "../protocol/workflow";
 import { backToBuild } from "../state/actions";
 import { replay, useReplay } from "../state/replayStore";
 import { useUiStore } from "../state/uiStore";
 import { spriteFor } from "../world/sprites";
 import { AgentConfigForm } from "./AgentConfigForm";
+import { RelationEditor } from "./RelationEditor";
 import { describePlace, excerpt } from "./documentView";
 import { agentRuntimeView, type AgentRuntimeView } from "./runtimeView";
 
@@ -38,9 +39,21 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+/** What a scripted agent was set to say, in a line. */
+function scriptedLines(agent: Agent, names: Record<string, string>): string {
+  const says = agent.model.script?.says;
+  if (!says) return "";
+  if (typeof says === "string") return says;
+  return Object.entries(says)
+    .map(([to, line]) => `to ${names[to] ?? to}: ${line}`)
+    .join("\n");
+}
+
 /** The configuration a run was started with. Read-only: only build mode edits the workflow. */
-function ConfigurationAsExecuted({ workflow, agent }: { workflow: Workflow; agent: Agent }) {
-  const does = relationsOf(workflow, agent.id);
+function ConfigurationAsExecuted({ workflow, agent, names }: { workflow: Workflow; agent: Agent; names: Record<string, string> }) {
+  const lines = scriptedLines(agent, names);
+  const writes = sheetMode(agent.model.script);
+  const sheet = scriptedSheet(agent.model.script);
   return (
     <>
       <p className="muted">As executed in this run.</p>
@@ -54,30 +67,31 @@ function ConfigurationAsExecuted({ workflow, agent }: { workflow: Workflow; agen
         <Field label="Model">
           {agent.model.provider} / {agent.model.name}
         </Field>
-        {agent.model.script?.message && (
-          <Field label="Scripted message">
-            <div className="message">{agent.model.script.message}</div>
+        {lines && (
+          <Field label="Scripted to say">
+            <div className="message">{lines}</div>
           </Field>
         )}
-        <Field label="What it does">
-          {does.length === 0 ? (
-            "—"
-          ) : (
-            <ul className="list">
-              {does.map((relation) => (
-                <li key={relation.id}>
-                  {sentence(workflow, relation)}
-                  {relation.required === false && <span className="muted"> (if it chooses)</span>}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Field>
+        {writes !== "default" && (
+          <Field label="Scripted to write">
+            {writes === "none" ? (
+              "Nothing: it only talks"
+            ) : (
+              <div className="message">
+                {sheet.title && <strong>{sheet.title}: </strong>}
+                {sheet.content}
+              </div>
+            )}
+          </Field>
+        )}
         <Field label="Sprite">{spriteFor(agent.appearance.sprite).label}</Field>
         <Field label="Id">
           <span className="muted">{agent.id}</span>
         </Field>
       </dl>
+      <div className="form">
+        <RelationEditor workflow={workflow} agent={agent} editable={false} />
+      </div>
     </>
   );
 }
@@ -152,7 +166,7 @@ export function AgentInspector({ workflow, agent, editable, names }: Props) {
         ))}
       </nav>
 
-      {tab === "Configuration" && <ConfigurationAsExecuted workflow={workflow} agent={agent} />}
+      {tab === "Configuration" && <ConfigurationAsExecuted workflow={workflow} agent={agent} names={names} />}
 
       {tab === "Runtime" && <Runtime agent={agent} view={view} names={names} />}
 
@@ -166,7 +180,14 @@ export function AgentInspector({ workflow, agent, editable, names }: Props) {
                 <strong>
                   {message.direction === "received" ? "from" : "to"} {names[message.peerId] ?? message.peerId}
                 </strong>
-                <div>{message.content}</div>
+                {/* What was said, then what was handed over. An old log has only the sheet, which is where the words were. */}
+                {message.said ? <div>“{message.said}”</div> : !message.sheet && <div className="muted">(nothing said)</div>}
+                {message.sheet && (
+                  <div className="muted">
+                    <span className="sheet-icon" />
+                    {message.said ? message.sheet.title || message.sheet.documentId : message.content}
+                  </div>
+                )}
               </li>
             ))}
           </ul>

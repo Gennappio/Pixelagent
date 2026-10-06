@@ -11,6 +11,11 @@ The three runs are real: each is what the office runtime emits for a workflow
 in <repo>/workflows. A change to the runtime, to the protocol or to one of
 those workflows shows up here.
 
+revision2/*.json are the same three runs as the runtime wrote them before
+revision 3, when a hand-off was a sheet and nothing else, kept exactly as they
+were with the registry they folded to then. Logs like these are in people's
+databases and exports: both folds must go on reading them the same way.
+
 workflow_v1.json holds workflows of revision 1 next to what they upgrade to;
 the web client upgrades the same ones with its own function.
 
@@ -50,6 +55,10 @@ RUNS = {
     # Two agents at work at the same time, and a third who waits for both.
     "parallel_run.json": ("two_desks", 2),
 }
+
+
+# Logs from before revision 3. Never regenerated: they are what was written then.
+LEGACY = sorted(path.relative_to(FIXTURES).as_posix() for path in (FIXTURES / "revision2").glob("*_run.json"))
 
 
 def stamped(run_id, stored):
@@ -128,7 +137,25 @@ async def test_a_real_run_is_exactly_its_shared_fixture(name, runs, events):
     assert wire[-1]["type"] == "RUN_FINISHED"
 
 
-@pytest.mark.parametrize("name", RUNS)
+def test_the_logs_from_before_revision_3_are_all_here():
+    assert LEGACY == ["revision2/demo_run.json", "revision2/parallel_run.json", "revision2/tables_run.json"]
+    for name in LEGACY:
+        events = json.loads((FIXTURES / name).read_text("utf-8"))["events"]
+        sent = [event["payload"] for event in events if event["type"] == "MESSAGE_SENT"]
+        # No words of their own, and a sheet every time.
+        assert sent and all("message" not in payload and payload["documentId"] for payload in sent)
+        # And a DECISION of kind "handoff" for every one of them, which the runtime no longer writes.
+        decided = [event for event in events if event["type"] == "DECISION" and event["payload"]["kind"] == "handoff"]
+        assert len(decided) == len(sent)
+
+
+def test_no_run_of_today_has_a_decision_nobody_made():
+    for name in RUNS:
+        kinds = {event["payload"]["kind"] for event in json.loads((FIXTURES / name).read_text("utf-8"))["events"] if event["type"] == "DECISION"}
+        assert kinds <= {"tool_selection", "routing", "budget"}, name
+
+
+@pytest.mark.parametrize("name", [*RUNS, *LEGACY])
 def test_a_stored_fixture_folds_to_its_stored_registry(name):
     stored = json.loads((FIXTURES / name).read_text("utf-8"))
     folded = DocumentRegistry.fold(AgentEvent.model_validate(event) for event in stored["events"])
@@ -149,22 +176,62 @@ def test_the_three_runs_between_them_use_every_kind_of_event_but_the_error():
     }  # fmt: skip
 
 
+def stored(name):
+    return json.loads((FIXTURES / name).read_text("utf-8"))
+
+
+def hand_offs(name):
+    return [event for event in stored(name)["events"] if event["type"] == "MESSAGE_SENT"]
+
+
+def test_the_three_runs_between_them_show_every_kind_of_hand_off():
+    # A sheet passed on as it is: the task, from Anna to Luca, in the demo.
+    assert hand_offs("demo_run.json")[0]["payload"]["documentId"] == "doc_input"
+    # A sheet the agent wrote.
+    assert (hand_offs("demo_run.json")[1]["payload"]["documentId"], hand_offs("demo_run.json")[1]["payload"]["title"]) == ("doc_1", "Sales number")
+    desks = {(event["actorId"], event["targetId"]): event["payload"] for event in hand_offs("parallel_run.json")}
+    # A photocopy for the second recipient, and a line for each.
+    assert "copyOf" not in desks["anna", "luca"]
+    assert desks["anna", "gianni"]["copyOf"] == desks["anna", "luca"]["documentId"] == "doc_input"
+    assert desks["anna", "luca"]["message"] != desks["anna", "gianni"]["message"]
+    # Words and nothing else.
+    assert desks["gianni", "marta"] == {"message": "Management has been warned."}
+    # Nothing said: the sheet speaks for itself.
+    assert hand_offs("tables_run.json")[-1]["payload"]["message"] == ""
+    # A new version written in someone's hands: Marta's, of the sheet Luca handed her.
+    result = stored("parallel_run.json")["events"][-1]["payload"]
+    assert (result["documentId"], result["version"], result["title"]) == (desks["luca", "marta"]["documentId"], 2, desks["luca", "marta"]["title"])
+
+
+def test_the_run_on_tables_has_a_tool_consulted_first_and_the_others_have_tools_the_agent_chose():
+    def calls(name):
+        events = stored(name)["events"]
+        return [(event["payload"]["tool"], event["payload"].get("required", False), events[index - 1]["type"]) for index, event in enumerate(events) if event["type"] == "TOOL_CALL"]
+
+    # Nobody decides a consulted tool: no DECISION comes before it.
+    assert calls("tables_run.json")[:2] == [("web_search", True, "DOCUMENT_TAKEN"), ("web_search", True, "DOCUMENT_TAKEN")]
+    assert calls("demo_run.json") == [("web_search", False, "DECISION"), ("send_email", False, "DECISION")]
+
+
 def test_the_run_on_tables_ends_with_a_versioned_sheet_on_the_board_and_empty_piles():
-    stored = json.loads((FIXTURES / "tables_run.json").read_text("utf-8"))["registry"]
-    assert stored["tables"] == {"todo": [], "done": [], "board": ["doc_5"]}
-    assert [version["version"] for version in stored["documents"]["doc_5"]["versions"]] == [1, 2]
-    assert stored["documents"]["doc_8"]["place"] == {"kind": "tray", "tray": "out"}
+    registry = stored("tables_run.json")["registry"]
+    assert registry["tables"] == {"todo": [], "done": [], "board": ["doc_5"]}
+    assert [version["version"] for version in registry["documents"]["doc_5"]["versions"]] == [1, 2]
+    assert registry["documents"]["doc_8"]["place"] == {"kind": "tray", "tray": "out"}
+    assert registry["documents"]["doc_8"]["versions"][0]["title"] == "Email sent"
 
 
 def test_the_parallel_run_has_two_turns_going_at_once():
-    events = json.loads((FIXTURES / "parallel_run.json").read_text("utf-8"))["events"]
+    events = stored("parallel_run.json")["events"]
     order = [(event["type"], event.get("actorId")) for event in events]
     luca = (order.index(("AGENT_STARTED", "luca")), order.index(("AGENT_FINISHED", "luca")))
     gianni = (order.index(("AGENT_STARTED", "gianni")), order.index(("AGENT_FINISHED", "gianni")))
     assert gianni[0] < luca[1] and luca[0] < gianni[1]
-    # Marta waited for both.
+    # Marta waited for both: Luca handed her a sheet, Gianni only told her something.
+    received = [event["targetId"] for event in events if event["type"] == "MESSAGE_RECEIVED" and event["actorId"] == "marta"]
+    assert sorted(received) == ["gianni", "luca"]
     marta = next(event for event in events if event["type"] == "AGENT_STARTED" and event["actorId"] == "marta")
-    assert len(marta["payload"]["documentIds"]) == 2
+    assert len(marta["payload"]["documentIds"]) == 1
 
 
 # Workflows of revision 1, as people may still have them in files and in exported runs.
@@ -218,9 +285,26 @@ def test_revision_1_workflows_upgrade_to_the_shared_fixture():
     )
 
 
-def test_the_demo_as_it_was_upgrades_to_the_demo_as_it_is():
+def test_the_demo_as_it_was_upgrades_to_the_office_the_demo_is_now():
     from server.workflow.demo import demo_workflow
 
+    def without_scripts(wire):
+        # What the scripted agents say and write was reworded for revision 3; who does what was not.
+        agents = [{**agent, "model": {key: value for key, value in agent["model"].items() if key != "script"}} for agent in wire["agents"]]
+        return {**{key: value for key, value in wire.items() if key != "id"}, "agents": agents}
+
     upgraded = WorkflowDefinition.model_validate(V1_CASES["the demo as it was"]).to_wire()
-    current = {key: value for key, value in demo_workflow().to_wire().items() if key != "id"}
-    assert upgraded == current
+    assert without_scripts(upgraded) == without_scripts(demo_workflow().to_wire())
+
+
+async def test_the_demo_as_it_was_still_runs_and_hands_over_sheets_with_nothing_said():
+    # A workflow from a revision 1 file keeps its old script: the words are the sheet, as they were then.
+    from office import run
+
+    from server.events.models import AgentEventType as T
+    from server.workflow.models import Workflow
+
+    drafts = await run(Workflow.model_validate(V1_CASES["the demo as it was"]), "Find the latest sales number and send it to management.")
+    sent = [draft.payload for draft in drafts if draft.type is T.MESSAGE_SENT]
+    assert [(payload["message"], payload["content"]) for payload in sent] == [("", "Find the latest sales number."), ("", "Send this result to management: Sales: €1.2M")]
+    assert (drafts[-1].type, drafts[-1].payload["output"]) == (T.RUN_FINISHED, "Email sent to management@example.com")

@@ -36,9 +36,29 @@ describe("laneSpans", () => {
     const order = types(sent);
     const spans = spansOf(sent);
     expect(spans.get("agent:luca")).toBe(order.indexOf("HAND_DOCUMENT"));
-    expect(spans.get("document:doc_1")).toBe(order.indexOf("HAND_DOCUMENT"));
+    expect(spans.get("document:doc_input")).toBe(order.indexOf("HAND_DOCUMENT"));
     expect(spans.get("agent:anna")).toBe(order.indexOf("RETURN_TO_POSITION"));
     expect(order.indexOf("HAND_DOCUMENT")).toBeLessThan(order.indexOf("RETURN_TO_POSITION"));
+  });
+
+  it("keeps whoever is spoken to until it has been said, when nothing is handed over", () => {
+    const told = eventOfType("MESSAGE_SENT", "gianni", parallelEvents);
+    const order = types(told);
+    expect(order).not.toContain("HAND_DOCUMENT");
+    const spans = spansOf(told);
+    // Marta listens for as long as the bubble is up, then is free while Gianni walks home.
+    expect(spans.get("agent:marta")).toBe(order.indexOf("SHOW_BUBBLE"));
+    expect(spans.get("agent:gianni")).toBe(order.indexOf("RETURN_TO_POSITION"));
+    expect([...spans.keys()].sort()).toEqual(["agent:gianni", "agent:marta"]);
+  });
+
+  it("holds the listener for a speech bubble and nobody else for a thought", () => {
+    const bubble = { type: "SHOW_BUBBLE", agentId: "anna", text: "…", kind: "speech", eventId: "e", holdMs: 1 } as const;
+    expect(lanesOfAction({ ...bubble, listenerId: "luca" })).toEqual(["agent:anna", "agent:luca"]);
+    expect(lanesOfAction(bubble)).toEqual(["agent:anna"]);
+    for (const event of [eventOfType("DECISION", "luca"), eventOfType("TOOL_RESULT", "luca")]) {
+      expect([...spansOf(event).keys()].filter((lane) => lane.startsWith("agent:"))).toEqual([`agent:${event.actorId}`]);
+    }
   });
 
   it("frees a tool station when the result is in, before the agent is back at its desk", () => {
@@ -77,7 +97,7 @@ describe("laneSpans", () => {
   });
 
   it("claims nothing for an event that shows nothing", () => {
-    const nobody = { ...eventOfType("DECISION", "anna"), actorId: undefined };
+    const nobody = { ...eventOfType("DECISION", "luca"), actorId: undefined };
     expect(mapEventToActions(nobody)).toEqual([]);
     expect(spansOf(nobody).size).toBe(0);
   });

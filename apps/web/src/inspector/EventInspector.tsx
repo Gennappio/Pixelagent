@@ -1,12 +1,17 @@
 import { EVENT_COLOR } from "../debugger/Timeline";
 import { describeEvent, formatTime } from "../debugger/transcript";
 import type { AgentEvent } from "../protocol/events";
+import { handOff } from "../protocol/handoff";
+import { contentText } from "./documentView";
 import { replay } from "../state/replayStore";
 import { useUiStore } from "../state/uiStore";
 
 /** The raw technical record behind a dot, a bubble or a transcript line. */
 export function EventInspector({ event, names }: { event: AgentEvent; names: Record<string, string> }) {
-  const full = typeof event.payload.content === "string" ? event.payload.content : undefined;
+  // A hand-off has two halves: what was said, and the sheet that went with it.
+  const handed = event.type === "MESSAGE_SENT" || event.type === "MESSAGE_RECEIVED" ? handOff(event) : undefined;
+  const written = handed ? handed.sheet?.content : event.payload.content;
+  const full = written === undefined || written === null ? "" : contentText(written);
   const select = useUiStore((state) => state.select);
   // The sheets this event is about: the one it carries, or the ones it lists.
   const { documentId, documentIds } = event.payload;
@@ -40,9 +45,15 @@ export function EventInspector({ event, names }: { event: AgentEvent; names: Rec
             <dd>{names[event.targetId] ?? event.targetId}</dd>
           </div>
         )}
+        {handed?.message && (
+          <div className="field">
+            <dt>Said</dt>
+            <dd className="message">{handed.message}</dd>
+          </div>
+        )}
         {full && (
           <div className="field">
-            <dt>Full message</dt>
+            <dt>{handed?.sheet ? `Handed over${handed.sheet.title ? `: ${handed.sheet.title}` : ""}` : "Content"}</dt>
             <dd className="message">{full}</dd>
           </div>
         )}

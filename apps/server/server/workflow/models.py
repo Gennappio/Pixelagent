@@ -99,8 +99,19 @@ OBJECT_KIND: dict[Verb, str | None] = {
     Verb.IS_EXIT: None,
 }
 
-# The verbs an agent may or may not act on, turn by turn, when `required` is false.
-OPTIONAL_VERBS = frozenset({Verb.SENDS_TO, Verb.WRITES_TABLE})
+# The verbs that either always happen or are left to the agent, and which of the two when a
+# relation does not say. True: the runtime does it. False: the agent chooses, turn by turn.
+# On every other verb `required` means nothing.
+REQUIRED_BY_DEFAULT: dict[Verb, bool] = {
+    Verb.SENDS_TO: True,
+    Verb.WRITES_TABLE: True,
+    # Optional: the agent may call the tool while it works. Required: it is consulted first,
+    # by the runtime, before the agent thinks.
+    Verb.USES_TOOL: False,
+}
+
+# Where the agent's sheet and its words go when its turn ends.
+OUTPUT_VERBS = frozenset({Verb.SENDS_TO, Verb.WRITES_TABLE})
 
 
 class Relation(CamelModel):
@@ -110,20 +121,31 @@ class Relation(CamelModel):
     subject: str
     verb: Verb
     object: str | None = None
-    # Only for sends_to and writes_table: false leaves it to the agent, turn by turn.
-    required: bool = True
-    # Required sends and writes of one subject happen in this order, then in declaration order.
+    # Unset means the verb's default (REQUIRED_BY_DEFAULT); once validated it is always a bool.
+    required: bool | None = None
+    # The position of the sentence among its subject's, ahead of the order they are written in:
+    # required outputs happen in this order, and what is consulted enters the context in it.
     order: int | None = None
     # How many times this relation may fire in one run. Unset: 5 on a cycle, unlimited otherwise.
     max_rounds: int | None = Field(default=None, ge=1)
     # Shown to the model: when this relation should be chosen.
     hint: str = ""
 
+    @model_validator(mode="after")
+    def _settle_required(self) -> "Relation":
+        default = REQUIRED_BY_DEFAULT.get(self.verb)
+        if default is None:
+            # Waiting, reading, taking, being the entry or the exit are not choices.
+            self.required = True
+        elif self.required is None:
+            self.required = default
+        return self
+
     @model_serializer(mode="wrap")
     def _as_a_sentence(self, handler: Any) -> dict[str, Any]:
         # On the wire a relation says only what is not the default, so files stay readable.
         data = handler(self)
-        if data.get("required") is True:
+        if data.get("required") == REQUIRED_BY_DEFAULT.get(self.verb, True):
             del data["required"]
         if data.get("hint") == "":
             del data["hint"]
@@ -217,8 +239,6 @@ class WorkflowDefinition(CamelModel):
                     raise ValueError(f"relation {relation.id}: sheets can only be taken from a pile")
                 if relation.verb is Verb.READS_TABLE and modes[relation.object] is not TableMode.SHARED:
                     raise ValueError(f"relation {relation.id}: a pile is taken from, not read")
-            if not relation.required and relation.verb not in OPTIONAL_VERBS:
-                raise ValueError(f"relation {relation.id}: {relation.verb.value} cannot be optional")
             sentence = (relation.subject, relation.verb, relation.object)
             if sentence in sentences:
                 raise ValueError(f"relation {relation.id} says the same as an earlier one")

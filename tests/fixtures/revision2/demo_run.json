@@ -27,7 +27,7 @@
             "provider": "fake",
             "name": "scripted-v1",
             "script": {
-              "says": "Find the latest sales number."
+              "message": "Find the latest sales number."
             }
           },
           "systemPrompt": "Coordinate the task and delegate work.",
@@ -45,11 +45,7 @@
             "provider": "fake",
             "name": "scripted-v1",
             "script": {
-              "says": "Send this to management.",
-              "sheet": {
-                "title": "Sales number",
-                "content": "{result}"
-              }
+              "message": "Send this result to management: {result}"
             }
           },
           "systemPrompt": "Research the request using the available tools and report the findings.",
@@ -65,13 +61,7 @@
           "instances": 1,
           "model": {
             "provider": "fake",
-            "name": "scripted-v1",
-            "script": {
-              "sheet": {
-                "title": "Email sent",
-                "content": "{result}"
-              }
-            }
+            "name": "scripted-v1"
           },
           "systemPrompt": "Deliver results to the right people.",
           "appearance": {
@@ -157,7 +147,7 @@
           "provider": "fake",
           "name": "scripted-v1",
           "script": {
-            "says": "Find the latest sales number."
+            "message": "Find the latest sales number."
           }
         },
         "documentIds": [
@@ -170,15 +160,13 @@
       "runId": "run_demo",
       "sequence": 3,
       "timestamp": "2026-10-05T14:31:02.000Z",
-      "type": "MESSAGE_SENT",
+      "type": "DECISION",
       "actorId": "anna",
-      "targetId": "luca",
       "payload": {
-        "message": "Find the latest sales number.",
-        "documentId": "doc_input",
-        "version": 1,
-        "title": "Task",
-        "content": "Find the latest sales number and send it to management."
+        "kind": "handoff",
+        "summary": "Hand off to Luca.",
+        "target": "luca",
+        "relationId": "r2"
       }
     },
     {
@@ -186,28 +174,45 @@
       "runId": "run_demo",
       "sequence": 4,
       "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "MESSAGE_SENT",
+      "actorId": "anna",
+      "targetId": "luca",
+      "payload": {
+        "content": "Find the latest sales number.",
+        "documentId": "doc_1",
+        "version": 1,
+        "title": "Message to Luca"
+      }
+    },
+    {
+      "id": "evt_0005",
+      "runId": "run_demo",
+      "sequence": 5,
+      "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_FINISHED",
       "actorId": "anna",
       "payload": {
-        "output": "Find the latest sales number and send it to management.",
+        "output": "Find the latest sales number.",
         "context": [
           {
             "kind": "system",
             "content": "Coordinate the task and delegate work."
           },
           {
-            "kind": "document",
+            "kind": "message",
             "from": "user",
-            "documentId": "doc_input",
-            "version": 1,
-            "title": "Task",
-            "content": "Find the latest sales number and send it to management."
+            "content": "Find the latest sales number and send it to management.",
+            "documentId": "doc_input"
+          },
+          {
+            "kind": "decision",
+            "content": "Hand off to Luca."
           },
           {
             "kind": "message_out",
             "to": "luca",
             "content": "Find the latest sales number.",
-            "documentId": "doc_input"
+            "documentId": "doc_1"
           }
         ],
         "metrics": {
@@ -217,51 +222,46 @@
       }
     },
     {
-      "id": "evt_0005",
+      "id": "evt_0006",
       "runId": "run_demo",
-      "sequence": 5,
+      "sequence": 6,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "MESSAGE_RECEIVED",
       "actorId": "luca",
       "targetId": "anna",
       "payload": {
-        "message": "Find the latest sales number.",
-        "documentId": "doc_input",
+        "content": "Find the latest sales number.",
+        "documentId": "doc_1",
         "version": 1,
-        "title": "Task",
-        "content": "Find the latest sales number and send it to management."
-      }
-    },
-    {
-      "id": "evt_0006",
-      "runId": "run_demo",
-      "sequence": 6,
-      "timestamp": "2026-10-05T14:31:02.000Z",
-      "type": "AGENT_STARTED",
-      "actorId": "luca",
-      "payload": {
-        "input": "Find the latest sales number.\nFind the latest sales number and send it to management.",
-        "role": "Researcher",
-        "model": {
-          "provider": "fake",
-          "name": "scripted-v1",
-          "script": {
-            "says": "Send this to management.",
-            "sheet": {
-              "title": "Sales number",
-              "content": "{result}"
-            }
-          }
-        },
-        "documentIds": [
-          "doc_input"
-        ]
+        "title": "Message to Luca"
       }
     },
     {
       "id": "evt_0007",
       "runId": "run_demo",
       "sequence": 7,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "AGENT_STARTED",
+      "actorId": "luca",
+      "payload": {
+        "input": "Find the latest sales number.",
+        "role": "Researcher",
+        "model": {
+          "provider": "fake",
+          "name": "scripted-v1",
+          "script": {
+            "message": "Send this result to management: {result}"
+          }
+        },
+        "documentIds": [
+          "doc_1"
+        ]
+      }
+    },
+    {
+      "id": "evt_0008",
+      "runId": "run_demo",
+      "sequence": 8,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DECISION",
       "actorId": "luca",
@@ -272,23 +272,23 @@
       }
     },
     {
-      "id": "evt_0008",
+      "id": "evt_0009",
       "runId": "run_demo",
-      "sequence": 8,
+      "sequence": 9,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "TOOL_CALL",
       "actorId": "luca",
       "payload": {
         "tool": "web_search",
         "arguments": {
-          "query": "Find the latest sales number and send it to management."
+          "query": "Find the latest sales number."
         }
       }
     },
     {
-      "id": "evt_0009",
+      "id": "evt_0010",
       "runId": "run_demo",
-      "sequence": 9,
+      "sequence": 10,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "TOOL_RESULT",
       "actorId": "luca",
@@ -311,30 +311,43 @@
       }
     },
     {
-      "id": "evt_0010",
+      "id": "evt_0011",
       "runId": "run_demo",
-      "sequence": 10,
+      "sequence": 11,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "DECISION",
+      "actorId": "luca",
+      "payload": {
+        "kind": "handoff",
+        "summary": "Hand off to Gianni.",
+        "target": "gianni",
+        "relationId": "r4"
+      }
+    },
+    {
+      "id": "evt_0012",
+      "runId": "run_demo",
+      "sequence": 12,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "MESSAGE_SENT",
       "actorId": "luca",
       "targetId": "gianni",
       "payload": {
-        "message": "Send this to management.",
-        "documentId": "doc_1",
+        "content": "Send this result to management: Sales: €1.2M",
+        "documentId": "doc_2",
         "version": 1,
-        "title": "Sales number",
-        "content": "Sales: €1.2M"
+        "title": "Message to Gianni"
       }
     },
     {
-      "id": "evt_0011",
+      "id": "evt_0013",
       "runId": "run_demo",
-      "sequence": 11,
+      "sequence": 13,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_FINISHED",
       "actorId": "luca",
       "payload": {
-        "output": "Sales: €1.2M",
+        "output": "Send this result to management: Sales: €1.2M",
         "context": [
           {
             "kind": "system",
@@ -343,15 +356,8 @@
           {
             "kind": "message",
             "from": "anna",
-            "content": "Find the latest sales number."
-          },
-          {
-            "kind": "document",
-            "from": "anna",
-            "documentId": "doc_input",
-            "version": 1,
-            "title": "Task",
-            "content": "Find the latest sales number and send it to management."
+            "content": "Find the latest sales number.",
+            "documentId": "doc_1"
           },
           {
             "kind": "decision",
@@ -361,7 +367,7 @@
             "kind": "tool_call",
             "tool": "web_search",
             "arguments": {
-              "query": "Find the latest sales number and send it to management."
+              "query": "Find the latest sales number."
             }
           },
           {
@@ -380,15 +386,14 @@
             "summary": "Sales: €1.2M"
           },
           {
-            "kind": "sheet",
-            "title": "Sales number",
-            "content": "Sales: €1.2M"
+            "kind": "decision",
+            "content": "Hand off to Gianni."
           },
           {
             "kind": "message_out",
             "to": "gianni",
-            "content": "Send this to management.",
-            "documentId": "doc_1"
+            "content": "Send this result to management: Sales: €1.2M",
+            "documentId": "doc_2"
           }
         ],
         "metrics": {
@@ -398,50 +403,43 @@
       }
     },
     {
-      "id": "evt_0012",
+      "id": "evt_0014",
       "runId": "run_demo",
-      "sequence": 12,
+      "sequence": 14,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "MESSAGE_RECEIVED",
       "actorId": "gianni",
       "targetId": "luca",
       "payload": {
-        "message": "Send this to management.",
-        "documentId": "doc_1",
+        "content": "Send this result to management: Sales: €1.2M",
+        "documentId": "doc_2",
         "version": 1,
-        "title": "Sales number",
-        "content": "Sales: €1.2M"
+        "title": "Message to Gianni"
       }
     },
     {
-      "id": "evt_0013",
+      "id": "evt_0015",
       "runId": "run_demo",
-      "sequence": 13,
+      "sequence": 15,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_STARTED",
       "actorId": "gianni",
       "payload": {
-        "input": "Send this to management.\nSales: €1.2M",
+        "input": "Send this result to management: Sales: €1.2M",
         "role": "Communication",
         "model": {
           "provider": "fake",
-          "name": "scripted-v1",
-          "script": {
-            "sheet": {
-              "title": "Email sent",
-              "content": "{result}"
-            }
-          }
+          "name": "scripted-v1"
         },
         "documentIds": [
-          "doc_1"
+          "doc_2"
         ]
       }
     },
     {
-      "id": "evt_0014",
+      "id": "evt_0016",
       "runId": "run_demo",
-      "sequence": 14,
+      "sequence": 16,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DECISION",
       "actorId": "gianni",
@@ -452,9 +450,9 @@
       }
     },
     {
-      "id": "evt_0015",
+      "id": "evt_0017",
       "runId": "run_demo",
-      "sequence": 15,
+      "sequence": 17,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "TOOL_CALL",
       "actorId": "gianni",
@@ -463,14 +461,14 @@
         "arguments": {
           "to": "management@example.com",
           "subject": "Update from Pixel Agents",
-          "body": "Sales: €1.2M"
+          "body": "Send this result to management: Sales: €1.2M"
         }
       }
     },
     {
-      "id": "evt_0016",
+      "id": "evt_0018",
       "runId": "run_demo",
-      "sequence": 16,
+      "sequence": 18,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "TOOL_RESULT",
       "actorId": "gianni",
@@ -489,9 +487,9 @@
       }
     },
     {
-      "id": "evt_0017",
+      "id": "evt_0019",
       "runId": "run_demo",
-      "sequence": 17,
+      "sequence": 19,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_FINISHED",
       "actorId": "gianni",
@@ -505,15 +503,8 @@
           {
             "kind": "message",
             "from": "luca",
-            "content": "Send this to management."
-          },
-          {
-            "kind": "document",
-            "from": "luca",
-            "documentId": "doc_1",
-            "version": 1,
-            "title": "Sales number",
-            "content": "Sales: €1.2M"
+            "content": "Send this result to management: Sales: €1.2M",
+            "documentId": "doc_2"
           },
           {
             "kind": "decision",
@@ -525,7 +516,7 @@
             "arguments": {
               "to": "management@example.com",
               "subject": "Update from Pixel Agents",
-              "body": "Sales: €1.2M"
+              "body": "Send this result to management: Sales: €1.2M"
             }
           },
           {
@@ -540,8 +531,7 @@
             "summary": "Email sent to management@example.com"
           },
           {
-            "kind": "sheet",
-            "title": "Email sent",
+            "kind": "output",
             "content": "Email sent to management@example.com"
           }
         ],
@@ -552,16 +542,16 @@
       }
     },
     {
-      "id": "evt_0018",
+      "id": "evt_0020",
       "runId": "run_demo",
-      "sequence": 18,
+      "sequence": 20,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "RUN_FINISHED",
       "payload": {
         "output": "Email sent to management@example.com",
-        "documentId": "doc_2",
+        "documentId": "doc_3",
         "version": 1,
-        "title": "Email sent",
+        "title": "Result",
         "authorId": "gianni"
       }
     }
@@ -580,7 +570,7 @@
         ],
         "place": {
           "kind": "filed",
-          "agentId": "luca"
+          "agentId": "anna"
         },
         "history": [
           {
@@ -593,22 +583,9 @@
             "agentId": "anna"
           },
           {
-            "sequence": 3,
-            "action": "handed",
-            "agentId": "anna",
-            "peerId": "luca",
-            "version": 1
-          },
-          {
             "sequence": 5,
-            "action": "received",
-            "agentId": "luca",
-            "peerId": "anna"
-          },
-          {
-            "sequence": 11,
             "action": "filed",
-            "agentId": "luca"
+            "agentId": "anna"
           }
         ]
       },
@@ -617,34 +594,34 @@
         "versions": [
           {
             "version": 1,
-            "title": "Sales number",
-            "content": "Sales: €1.2M",
-            "authorId": "luca",
-            "createdSequence": 10
+            "title": "Message to Luca",
+            "content": "Find the latest sales number.",
+            "authorId": "anna",
+            "createdSequence": 4
           }
         ],
         "place": {
           "kind": "filed",
-          "agentId": "gianni"
+          "agentId": "luca"
         },
         "history": [
           {
-            "sequence": 10,
+            "sequence": 4,
             "action": "handed",
-            "agentId": "luca",
-            "peerId": "gianni",
+            "agentId": "anna",
+            "peerId": "luca",
             "version": 1
           },
           {
-            "sequence": 12,
+            "sequence": 6,
             "action": "received",
-            "agentId": "gianni",
-            "peerId": "luca"
+            "agentId": "luca",
+            "peerId": "anna"
           },
           {
-            "sequence": 17,
+            "sequence": 13,
             "action": "filed",
-            "agentId": "gianni"
+            "agentId": "luca"
           }
         ]
       },
@@ -653,10 +630,46 @@
         "versions": [
           {
             "version": 1,
-            "title": "Email sent",
+            "title": "Message to Gianni",
+            "content": "Send this result to management: Sales: €1.2M",
+            "authorId": "luca",
+            "createdSequence": 12
+          }
+        ],
+        "place": {
+          "kind": "filed",
+          "agentId": "gianni"
+        },
+        "history": [
+          {
+            "sequence": 12,
+            "action": "handed",
+            "agentId": "luca",
+            "peerId": "gianni",
+            "version": 1
+          },
+          {
+            "sequence": 14,
+            "action": "received",
+            "agentId": "gianni",
+            "peerId": "luca"
+          },
+          {
+            "sequence": 19,
+            "action": "filed",
+            "agentId": "gianni"
+          }
+        ]
+      },
+      "doc_3": {
+        "id": "doc_3",
+        "versions": [
+          {
+            "version": 1,
+            "title": "Result",
             "content": "Email sent to management@example.com",
             "authorId": "gianni",
-            "createdSequence": 18
+            "createdSequence": 20
           }
         ],
         "place": {
@@ -665,7 +678,7 @@
         },
         "history": [
           {
-            "sequence": 18,
+            "sequence": 20,
             "action": "delivered",
             "agentId": "gianni"
           }
@@ -675,7 +688,8 @@
     "order": [
       "doc_input",
       "doc_1",
-      "doc_2"
+      "doc_2",
+      "doc_3"
     ],
     "tables": {}
   },
@@ -695,135 +709,215 @@
     {
       "doc_input": {
         "kind": "hand",
-        "agentId": "luca"
+        "agentId": "anna"
       }
     },
     {
       "doc_input": {
         "kind": "hand",
-        "agentId": "luca"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "hand",
-        "agentId": "luca"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "hand",
-        "agentId": "luca"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "hand",
-        "agentId": "luca"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "hand",
-        "agentId": "luca"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "hand",
-        "agentId": "luca"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "hand",
-        "agentId": "luca"
+        "agentId": "anna"
       },
       "doc_1": {
         "kind": "hand",
-        "agentId": "gianni"
+        "agentId": "luca"
       }
     },
     {
       "doc_input": {
         "kind": "filed",
-        "agentId": "luca"
+        "agentId": "anna"
       },
       "doc_1": {
         "kind": "hand",
-        "agentId": "gianni"
+        "agentId": "luca"
       }
     },
     {
       "doc_input": {
         "kind": "filed",
-        "agentId": "luca"
+        "agentId": "anna"
       },
       "doc_1": {
         "kind": "hand",
-        "agentId": "gianni"
+        "agentId": "luca"
       }
     },
     {
       "doc_input": {
         "kind": "filed",
-        "agentId": "luca"
+        "agentId": "anna"
       },
       "doc_1": {
         "kind": "hand",
-        "agentId": "gianni"
+        "agentId": "luca"
       }
     },
     {
       "doc_input": {
         "kind": "filed",
-        "agentId": "luca"
+        "agentId": "anna"
       },
       "doc_1": {
         "kind": "hand",
-        "agentId": "gianni"
+        "agentId": "luca"
       }
     },
     {
       "doc_input": {
         "kind": "filed",
-        "agentId": "luca"
+        "agentId": "anna"
       },
       "doc_1": {
         "kind": "hand",
-        "agentId": "gianni"
+        "agentId": "luca"
       }
     },
     {
       "doc_input": {
         "kind": "filed",
-        "agentId": "luca"
+        "agentId": "anna"
       },
       "doc_1": {
         "kind": "hand",
-        "agentId": "gianni"
+        "agentId": "luca"
       }
     },
     {
       "doc_input": {
         "kind": "filed",
-        "agentId": "luca"
+        "agentId": "anna"
       },
       "doc_1": {
-        "kind": "filed",
-        "agentId": "gianni"
+        "kind": "hand",
+        "agentId": "luca"
       }
     },
     {
       "doc_input": {
         "kind": "filed",
-        "agentId": "luca"
+        "agentId": "anna"
       },
       "doc_1": {
-        "kind": "filed",
-        "agentId": "gianni"
+        "kind": "hand",
+        "agentId": "luca"
       },
       "doc_2": {
+        "kind": "hand",
+        "agentId": "gianni"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_2": {
+        "kind": "hand",
+        "agentId": "gianni"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_2": {
+        "kind": "hand",
+        "agentId": "gianni"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_2": {
+        "kind": "hand",
+        "agentId": "gianni"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_2": {
+        "kind": "hand",
+        "agentId": "gianni"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_2": {
+        "kind": "hand",
+        "agentId": "gianni"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_2": {
+        "kind": "hand",
+        "agentId": "gianni"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "gianni"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "gianni"
+      },
+      "doc_3": {
         "kind": "tray",
         "tray": "out"
       }

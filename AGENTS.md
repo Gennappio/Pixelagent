@@ -167,13 +167,25 @@ Phase 10  relations and the office runtime: a workflow is a list of sentences
           agent inspector; the graph derived from relations, read-only
 ```
 
-Not done: everything in §38 from Phase 11 on. Revision 3 rewrote the plan from
-there: Phases 11–14 are the changes this revision makes (the three slots and
+Done in revision 3:
+
+```text
+Phase 11  the three slots and the spoken message: `required` on uses_tool, and a tool
+          consulted first by the runtime; a hand-off is something said plus at most one
+          sheet, which is new, a new version of one in hand, or one passed on, and is
+          photocopied for a second recipient; the result is the exit agent's last sheet;
+          both folds read hand-offs old and new, and the logs of Phase 10 are kept as
+          fixtures; the bubble and the transcript say what was said; the sentence
+          editor in the inspector shows the three slots
+```
+
+Not done: everything in §38 from Phase 12 on. Revision 3 rewrote the plan from
+Phase 11: Phases 11–14 are the changes this revision makes (the three slots and
 the spoken message, the camera, building on the characters, the game
 interface), and the phases of revision 2 follow them, renumbered. Today a
 workflow is built by adding agents and tables in the Office panel and saying
-what each agent does in its inspector, a hand-off carries a sheet and nothing
-else, and the panels are the plain ones of Phase 7.
+what each agent does in its inspector, slot by slot, and the panels are the
+plain ones of Phase 7.
 
 The deterministic demo in §34 passes and must keep passing after every phase.
 
@@ -580,8 +592,11 @@ AGENT_STARTED      input: what arrived, as text (each message, then its sheet, i
 MESSAGE_SENT       message: what is said, may be empty; then, when a sheet goes with it,
                    documentId, version, title, content, summary?, copyOf? (§9)
 MESSAGE_RECEIVED   same as MESSAGE_SENT
-DECISION           kind: "tool_selection" | "routing" | "handoff" | "budget", summary,
-                   relationId? (routing), tool? (tool_selection)
+DECISION           kind: "tool_selection" | "routing" | "budget", summary,
+                   relationId? (routing, budget), tool? (tool_selection). Only what an
+                   agent chose, or a limit reached: a hand-off that always happens has
+                   none, like a tool consulted first. Logs from before Phase 11 also carry
+                   kind "handoff", one for every hand-off
 TOOL_CALL          tool, arguments, required?: true when the runtime called it at turn start
                    for a required uses_tool (no DECISION precedes it)
 TOOL_RESULT        tool, result, summary, metrics { latencyMs }
@@ -1013,11 +1028,15 @@ keys; the camera controls come with Phase 12, the icon bar with Phase 14.
 # 24. Build Mode
 
 What exists today: agents and tables are added in the Office panel, and what
-an agent does is said in its inspector, one sentence at a time: pick a verb,
-pick what it applies to, add. Each sentence can be reordered, removed, or (for
-handing over and writing) left to the agent with "if it chooses". A router's
-rules are edited there too. The Office panel says what a workflow still lacks
-before it can run.
+an agent does is said in its inspector, in the three slots of §7: in a slot
+pick a phrase, pick what it applies to, add. Each sentence can be reordered
+within its slot, removed, set to "always" or "if it chooses" (handing over and
+writing), or switched between "can use" and "consults first" (a tool with one
+text argument). The hand-offs others make to the agent are listed greyed among
+what arrives, with a jump to the sender. A router's rules, and what a scripted
+agent says and writes, are edited there too. The Office panel says what a
+workflow still lacks before it can run, a tool consulted first that cannot be
+among it.
 
 Where it goes: the sentences are edited on the characters and objects
 themselves, and the inspector keeps only the configuration form. Nothing is
@@ -1185,14 +1204,16 @@ pixel-agents/
     storage/                database.py, event_repository.py, run_repository.py, workflow_repository.py
     websocket/              manager.py
   apps/web/src/
-    protocol/               events.ts, workflow.ts, relations.ts (the verbs), migrate.ts, documents.ts
+    protocol/               events.ts, workflow.ts, relations.ts (the verbs and their slots), migrate.ts,
+                            documents.ts, handoff.ts (a hand-off of any revision, read in one place)
     animation/              VisualEventMapper.ts, visualActions.ts, lanes.ts, EventAnimation.ts,
                             AnimationScheduler.ts
     world/                  PixelWorld.ts, AgentSprite.ts, DocumentSprite.ts, Furniture.ts (trays, tables),
                             Room.ts, Devices.ts, ToolStation.ts, SpeechBubble.ts, sprites.ts,
                             Camera.ts (zoom steps, gestures), layout.ts, worldState.ts
-    build/                  workflowEdits.ts (later: ContextMenu.tsx, picking.ts (the pending sentence
-                            and what it lights), Palette.tsx, dragMove.ts)
+    build/                  workflowEdits.ts, scriptEdits.ts (what a scripted agent says and writes)
+                            (later: ContextMenu.tsx, picking.ts (the pending sentence and what it
+                            lights), Palette.tsx, dragMove.ts)
     graph/                  GraphView.tsx (read-only), deriveGraph.ts, nodes.tsx
     hud/                    panels.ts (state, persistence, insets), shortcuts.ts (the table),
                             useShortcuts.ts, Panel.tsx, TopBar.tsx, OfficePanel.tsx,
@@ -1290,6 +1311,9 @@ tables_run.json   workflows/supplier_board.json: a pile worked sheet by sheet, a
 parallel_run.json workflows/two_desks.json, two turns at once: two agents at work at the
                   same time and a third who waits for both
 workflow_v1.json  workflows of revision 1 next to what they upgrade to
+revision2/        the same three runs as Phase 10 wrote them, when a hand-off was a sheet
+                  and nothing else, with the registry they folded to then. Never
+                  regenerated: both folds must go on reading them the same way
 ```
 
 The three runs are real: each is exactly what the runtime emits for that
@@ -1313,8 +1337,9 @@ Luca says to Gianni "Send this to management." and hands over the sheet.
 Gianni uses send_email. MockEmail returns success. Gianni writes "Email sent" and is_exit.
 ```
 
-Until Phase 11 the hand-offs carry the sheet alone, with the words as its
-content; the demo passes either way.
+Before Phase 11 the hand-offs carried the sheet alone, with the words as its
+content. The demo as it was logged then is one of the fixtures in
+`tests/fixtures/revision2/` (§33), and still folds and replays.
 
 Expressed as relations in `workflows/demo.json` (§6). Two more workflows ship
 beside it and need no API keys either: `supplier_board.json` (a splitter, two
@@ -1376,7 +1401,7 @@ it, fork the run. Do not start it before replay and relations are stable.
 
 # 38. Development Order
 
-Phases 1–10 are done (§4). Each phase below ends with `npm test` green and
+Phases 1–11 are done (§4). Each phase below ends with `npm test` green and
 the demo of §34 passing. Do not start a phase before the previous one is
 merged.
 
@@ -1436,7 +1461,7 @@ the three fixture runs are real runs of workflows/*.json
 The sentence editor was planned for Phase 11. It moved here because removing
 graph editing without it would have left no way to build a workflow.
 
-## Phase 11 — Three slots and the spoken message
+## Phase 11 — Three slots and the spoken message (done)
 
 The model changes of revision 3, end to end, before any new interface.
 Nothing in this phase needs an API key.
@@ -1459,6 +1484,45 @@ transcript: `Anna to Luca: "…" and handed over "…"`, and "consulted" for a r
 the sentence editor in the inspector shows the three slots, with "consults first" where
   allowed; the phrase lists on both sides say hands to, consults first
 the demo of §34 in its new wording, still deterministic, still passing
+```
+
+Settled while building it, where this document left room:
+
+```text
+the result       the last sheet the exit agent produced, of any of the three kinds of §9:
+                 one it passed on as it was is a result too. A later turn in which it
+                 writes nothing leaves the result as it was; an exit that only ever talks
+                 leaves none (NoResult)
+tables           a table gets the turn's sheet under its own rule (§7): it is not a
+                 photocopy, and DOCUMENT_WRITTEN carries no copyOf. With no sheet that
+                 turn, a required writes_table writes nothing
+empty hand-offs  a required sends_to always happens: with words alone, or with nothing
+                 said and nothing handed, which still starts the recipient's turn
+no decision      a required sends_to has no DECISION before it: nobody decided it, as with
+                 a tool consulted first. DECISION is left for what an agent chose (routing,
+                 tool_selection) and for a limit reached (budget). The demo log went from
+                 20 events to 18
+AGENT_FINISHED   output is the turn's sheet as text; with no sheet, what was said
+the fake agent   model.script: `says` (one line for everyone, or a line per recipient id)
+                 and `sheet` ({title, content}; false for none). {input}, {sheet} and
+                 {result} are filled in. Unscripted, it writes what its last tool
+                 returned, else passes on the first sheet it holds. Its tools get the
+                 sheets it holds as their text arguments, or what it was told when it
+                 holds none. `message`, the script of revision 2, is still read: it is
+                 the sheet, with nothing said
+rule agents      the router and the splitter go by the sheets they hold, not by what was
+                 said about them; with no sheet, by the words. The collector names its
+                 sheet after the pile
+GET /tools       already says `consultable` (planned for Phase 16): the editor needs it
+                 to offer "consults first" only where the server would accept it
+the listener     SHOW_BUBBLE names who is spoken to and holds their lane until it has
+                 been said. With nothing handed over, nothing else would keep them there
+old logs         tests/fixtures/revision2/ (§33). `protocol/handoff.ts` is the one place
+                 the web reads a hand-off of any revision: words and sheet, a sheet with
+                 the words as its content, or words alone
+the examples     supplier_board has Luca consult the search first; two_desks shows a
+                 photocopy, a line per recipient, words alone and a version written in
+                 someone's hands, so the shared fixtures cover every kind of hand-off
 ```
 
 ## Phase 12 — Camera

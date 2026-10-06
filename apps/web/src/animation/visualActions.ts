@@ -15,7 +15,8 @@ export type VisualAction =
   | { type: "MOVE_TO"; agentId: string; target: MoveTarget }
   | { type: "RETURN_TO_POSITION"; agentId: string }
   | { type: "TALK"; agentId: string }
-  | { type: "SHOW_BUBBLE"; agentId: string; text: string; kind: BubbleKind; eventId: string; holdMs: number }
+  // `listenerId`: who is being spoken to. They are part of it for as long as the bubble is up.
+  | { type: "SHOW_BUBBLE"; agentId: string; text: string; kind: BubbleKind; eventId: string; holdMs: number; listenerId?: string }
   | { type: "HIDE_BUBBLE"; agentId: string }
   | { type: "WORK"; agentId: string }
   | { type: "SHOW_TOOL_ICON"; tool: string; agentId: string }

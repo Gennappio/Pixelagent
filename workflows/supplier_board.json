@@ -19,7 +19,11 @@
         "provider": "fake",
         "name": "scripted-v1",
         "script": {
-          "message": "Supplier A\nSupplier B"
+          "says": "Research these two suppliers.",
+          "sheet": {
+            "title": "Suppliers",
+            "content": "Supplier A\nSupplier B"
+          }
         }
       },
       "systemPrompt": "Name the suppliers to research, one per line.",
@@ -50,7 +54,13 @@
       "instances": 1,
       "model": {
         "provider": "fake",
-        "name": "scripted-v1"
+        "name": "scripted-v1",
+        "script": {
+          "sheet": {
+            "title": "Finding",
+            "content": "{result}"
+          }
+        }
       },
       "systemPrompt": "Research the supplier on the sheet you take.",
       "appearance": {
@@ -80,7 +90,13 @@
       "instances": 1,
       "model": {
         "provider": "fake",
-        "name": "scripted-v1"
+        "name": "scripted-v1",
+        "script": {
+          "sheet": {
+            "title": "Email sent",
+            "content": "{result}"
+          }
+        }
       },
       "systemPrompt": "Deliver results to the right people.",
       "appearance": {
@@ -139,7 +155,8 @@
       "id": "r5",
       "subject": "luca",
       "verb": "uses_tool",
-      "object": "web_search"
+      "object": "web_search",
+      "required": true
     },
     {
       "id": "r6",

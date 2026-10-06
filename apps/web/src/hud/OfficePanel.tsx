@@ -62,7 +62,7 @@ export function OfficePanel() {
   const shown = run?.workflow ?? workflow;
   const inUse = useMemo(() => toolsInUse(shown), [shown]);
   const names = useMemo(() => namesOf(shown), [shown]);
-  const missing = useMemo(() => whyNotRunnable(workflow), [workflow]);
+  const missing = useMemo(() => whyNotRunnable(workflow, tools), [workflow, tools]);
   // Every sheet of the run as of the playhead, filed ones included: those are out of
   // sight in the world, and this list is how to get back to them.
   const { position, total } = useReplay();

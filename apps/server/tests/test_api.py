@@ -35,6 +35,13 @@ def wait_for_run(client, run_id):
     raise AssertionError("run did not finish")
 
 
+def test_tools_are_listed_with_whether_they_can_be_consulted_first(client):
+    tools = {tool["name"]: tool for tool in client.get("/tools").json()}
+    assert {name: tool["consultable"] for name, tool in tools.items()} == {"web_search": True, "send_email": False, "calculator": True}
+    assert tools["web_search"]["schema"]["required"] == ["query"]
+    assert tools["web_search"]["description"]
+
+
 def test_demo_workflow_is_seeded(client, tmp_path):
     assert [summary["id"] for summary in client.get("/workflows").json()] == ["demo"]
     assert client.get("/workflows/demo").json() == demo_workflow().to_wire()
@@ -167,7 +174,8 @@ def test_run_stream_delivers_the_complete_ordered_log(client):
     assert wait_for_run(client, run["id"])["status"] == "finished"
     # Live stream and stored log are the same data: replay needs nothing else.
     assert client.get(f"/runs/{run['id']}/events").json() == streamed
-    assert client.get(f"/runs/{run['id']}/events?after=18").json() == streamed[18:]
+    assert len(streamed) == 18
+    assert client.get(f"/runs/{run['id']}/events?after=12").json() == streamed[12:]
 
 
 def test_stream_of_a_finished_run_replays_from_storage(client):
@@ -190,5 +198,5 @@ def test_run_export_contains_pipeline_context_and_events(client):
     assert all(e["payload"]["context"] for e in finished)
     # Documents are not a resource of their own: the events in the export carry them.
     carried = [e["payload"]["documentId"] for e in export["events"] if "documentId" in e["payload"]]
-    assert list(dict.fromkeys(carried)) == ["doc_input", "doc_1", "doc_2", "doc_3"]
+    assert list(dict.fromkeys(carried)) == ["doc_input", "doc_1", "doc_2"]
     assert [r["id"] for r in client.get("/runs?workflow_id=demo").json()] == [run["id"]]

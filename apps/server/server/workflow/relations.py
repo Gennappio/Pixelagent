@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from typing import Any
 
-from server.workflow.models import Agent, Relation, Verb, Workflow, WorkflowTable
+from server.tools.base import sole_argument
+from server.workflow.models import OUTPUT_VERBS, Agent, Relation, Verb, Workflow, WorkflowTable
 
 # A relation on a cycle may fire this many times in a run unless it says otherwise.
 DEFAULT_CYCLE_ROUNDS = 5
 
-# How each verb reads in a sentence, for messages meant for people.
+# How each verb reads in a sentence, for messages meant for people. The web client shows
+# the same words (apps/web/src/protocol/relations.ts).
 PHRASE = {
-    Verb.SENDS_TO: "hands a sheet to",
+    Verb.SENDS_TO: "hands to",
     Verb.WAITS_FOR: "waits for",
     Verb.USES_TOOL: "can use",
     Verb.READS_TABLE: "reads",
@@ -20,6 +23,12 @@ PHRASE = {
     Verb.IS_ENTRY: "is the entry",
     Verb.IS_EXIT: "is the exit",
 }
+# A tool the agent does not choose: the runtime fetches it before the agent thinks.
+CONSULTS_FIRST = "consults first"
+
+
+def phrase(relation: Relation) -> str:
+    return CONSULTS_FIRST if relation.verb is Verb.USES_TOOL and relation.required else PHRASE[relation.verb]
 
 
 class WorkflowError(Exception):
@@ -74,22 +83,39 @@ class Office:
         return self._only(Verb.IS_EXIT)
 
     def tools(self, agent_id: str) -> list[str]:
+        """Every tool the agent has to do with, whoever calls it."""
         return [relation.object for relation in self.of(agent_id, Verb.USES_TOOL) if relation.object]
+
+    def optional_tools(self, agent_id: str) -> list[str]:
+        """The tools the agent may call while it works."""
+        return [relation.object for relation in self.of(agent_id, Verb.USES_TOOL) if relation.object and not relation.required]
+
+    def consults(self, agent_id: str) -> list[Relation]:
+        """What is fetched for the agent before it thinks, in sentence order: tables it reads, tools it consults first."""
+        return self.in_order(
+            relation
+            for relation in self.workflow.relations
+            if relation.subject == agent_id and (relation.verb is Verb.READS_TABLE or (relation.verb is Verb.USES_TOOL and relation.required))
+        )
+
+    def outputs(self, agent_id: str) -> list[Relation]:
+        """Where the agent's sheet and words can go when its turn ends, in sentence order."""
+        return self.in_order(relation for relation in self.workflow.relations if relation.subject == agent_id and relation.verb in OUTPUT_VERBS)
 
     def waits_for(self, agent_id: str) -> list[str]:
         return [relation.object for relation in self.of(agent_id, Verb.WAITS_FOR) if relation.object]
 
     def sentence(self, relation: Relation) -> str:
-        """The relation in words, e.g. “Anna hands a sheet to Luca”."""
+        """The relation in words, e.g. “Anna hands to Luca”."""
         subject = self._agents[relation.subject].name
         if relation.object is None:
-            return f"{subject} {PHRASE[relation.verb]}"
+            return f"{subject} {phrase(relation)}"
         target = relation.object
         if target in self._agents:
             target = self._agents[target].name
         elif target in self._tables:
             target = self._tables[target].name or target
-        return f"{subject} {PHRASE[relation.verb]} {target}"
+        return f"{subject} {phrase(relation)} {target}"
 
     def closes_cycle(self, relation: Relation) -> bool:
         """Whether sheets handed along this relation can come back round to its subject."""
@@ -112,20 +138,29 @@ class Office:
             return relation.max_rounds
         return DEFAULT_CYCLE_ROUNDS if self.closes_cycle(relation) else None
 
-    def check_runnable(self, known_tools: Iterable[str], known_providers: Iterable[str]) -> None:
-        """Raises WorkflowError for what a saved workflow may still lack and a run cannot do without."""
+    def check_runnable(self, tool_schemas: Mapping[str, dict[str, Any]], known_providers: Iterable[str]) -> None:
+        """Raises WorkflowError for what a saved workflow may still lack and a run cannot do without.
+
+        `tool_schemas` are the argument schemas of the tools this server has, by name.
+        """
         if not self.workflow.agents:
             raise WorkflowError("The office has no agents yet.")
         if self.entry is None:
             raise WorkflowError("No agent is the entry: pick the one that receives the task.")
         if self.exit is None:
-            raise WorkflowError("No agent is the exit: pick the one whose output is the result.")
-        tools, providers = set(known_tools), set(known_providers)
+            raise WorkflowError("No agent is the exit: pick the one whose sheet is the result.")
+        providers = set(known_providers)
         for agent in self.workflow.agents:
             if agent.instances != 1:
                 raise WorkflowError(f"{agent.name} has {agent.instances} instances; several instances of one agent are not supported yet.")
             if agent.model.provider not in providers:
                 raise WorkflowError(f"{agent.name} uses the unknown model provider {agent.model.provider!r}.")
-            for tool in self.tools(agent.id):
-                if tool not in tools:
-                    raise WorkflowError(f"{agent.name} can use the tool {tool!r}, which this server does not have.")
+            for relation in self.of(agent.id, Verb.USES_TOOL):
+                tool = relation.object or ""
+                if tool not in tool_schemas:
+                    raise WorkflowError(f"{agent.name} is given the tool {tool!r}, which this server does not have.")
+                if relation.required and sole_argument(tool_schemas[tool]) is None:
+                    raise WorkflowError(
+                        f"{agent.name} consults {tool!r} first, but only a tool with exactly one required text argument can be consulted first: "
+                        f"let {agent.name} use it instead."
+                    )

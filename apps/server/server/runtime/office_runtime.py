@@ -5,7 +5,7 @@ import itertools
 import json
 import time
 from collections import Counter
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -15,14 +15,25 @@ from server.events.models import AgentEventType as T
 from server.events.models import EventDraft
 from server.runtime.base import AgentRuntime, AgentRuntimeError, BudgetExceeded, Deadlock, NoResult, ToolError
 from server.runtime.providers.fake import FakeProvider
-from server.runtime.providers.rule import RuleProvider, title_of
-from server.runtime.turn import ContextItem, ToolOutcome, ToolRequest, TurnContext, TurnProvider, TurnResult
-from server.tools.base import ToolRegistry
-from server.workflow.models import OPTIONAL_VERBS, Agent, Relation, TableMode, Verb, Workflow, WorkflowTable
+from server.runtime.providers.rule import RuleProvider
+from server.runtime.turn import (
+    ContextItem,
+    HeldSheet,
+    Said,
+    Sheet,
+    ToolOutcome,
+    ToolRequest,
+    TurnContext,
+    TurnProvider,
+    TurnResult,
+    as_text,
+)
+from server.tools.base import Tool, ToolRegistry, sole_argument
+from server.workflow.models import Agent, Relation, TableMode, Verb, Workflow, WorkflowTable
 from server.workflow.relations import Office
 
-# What a turn leaves for others: (recipient, the sheet's identity, its text).
-Outgoing = tuple[str, dict[str, Any], str]
+# What a turn leaves for another agent: (recipient, what is said, the sheet that goes with it, if any).
+Outgoing = tuple[str, str, dict[str, Any] | None]
 
 
 def summarize(result: Any) -> str:
@@ -31,23 +42,25 @@ def summarize(result: Any) -> str:
     return result if isinstance(result, str) else json.dumps(result, ensure_ascii=False)
 
 
-def as_text(content: Any) -> str:
-    return content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
-
-
 def elapsed_ms(started: float) -> int:
     return round((time.perf_counter() - started) * 1000)
 
 
 class OfficeRuntime(AgentRuntime):
-    """Runs a workflow by its relations: who hands sheets to whom, who waits, who uses what.
+    """Runs a workflow by its relations: who hands to whom, who waits, who consults what.
 
-    Agents take turns. A turn starts from what is waiting for the agent (sheets handed to
-    it, or one taken from a pile), lets its provider use tools and decide, and ends by
-    writing on tables and handing sheets on. What a turn sends reaches the others when the
-    turn is over; that is the only moment the office looks for who can go next, which keeps
-    the log the same however many turns may run at once, wherever work is passed along a
-    chain.
+    Agents take turns, and a turn is one task with three slots the runtime fills. What
+    arrives starts it: hand-offs (something said, with or without a sheet), or a sheet
+    taken from a pile. What the agent consults is fetched before its provider is asked
+    anything: the tables it reads, the tools it consults first. Then the provider works,
+    calling the tools it may use, and ends with at most one sheet and a line for each
+    recipient; the runtime hands that on, photocopying the sheet when several get it, and
+    writes it on tables. Nothing is sequenced inside a turn beyond the order of an agent's
+    sentences.
+
+    What a turn sends reaches the others when the turn is over; that is the only moment
+    the office looks for who can go next, which keeps the log the same however many turns
+    may run at once, wherever work is passed along a chain.
 
     Up to `concurrency` agents work at the same time. With 1, and deterministic providers,
     the event log is reproducible byte for byte.
@@ -74,14 +87,31 @@ class OfficeRuntime(AgentRuntime):
 
 @dataclass(frozen=True)
 class _Letter:
-    """A sheet waiting for an agent."""
+    """A hand-off waiting for an agent: what was said, and the sheet that came with it, if any."""
 
-    # None: the task, which nobody in the office wrote.
+    # None: the task, which nobody in the office handed over.
     sender: str | None
-    reference: dict[str, Any]
-    content: str
+    message: str
+    # documentId, version, title, content and, for a photocopy, copyOf: as in the event.
+    sheet: dict[str, Any] | None
     # Arrival order across the whole office: the oldest thing waiting goes first.
     stamp: int
+
+    @property
+    def payload(self) -> dict[str, Any]:
+        """The hand-off as MESSAGE_SENT and MESSAGE_RECEIVED carry it."""
+        return {"message": self.message, **(self.sheet or {})}
+
+
+@dataclass
+class _Paper:
+    """The one sheet a turn produces: new, a new version of one the agent held, or one it held, passed on."""
+
+    title: str
+    content: Any
+    # None until the sheet first appears in an event: a new sheet has no id before that.
+    document_id: str | None = None
+    version: int = 1
 
 
 @dataclass
@@ -129,7 +159,8 @@ class _Run:
         self.turns: Counter[str] = Counter()
         self.fired: Counter[str] = Counter()
         self.exhausted: set[str] = set()
-        self.outputs: dict[str, str] = {}
+        # The last sheet the exit agent produced: the result of the run, once the office is quiet.
+        self.outcome: _Paper | None = None
 
     # -- the run as a whole
 
@@ -142,11 +173,12 @@ class _Run:
             )
         )
         # After RUN_STARTED, so that a workflow that cannot run still leaves a log saying why.
-        self.office.check_runnable((tool.name for tool in self.runtime.tools.list()), self.runtime.providers)
+        self.office.check_runnable({tool.name: tool.schema for tool in self.runtime.tools.list()}, self.runtime.providers)
 
         entry = self.office.entry
         assert entry is not None  # check_runnable
-        self.inbox[entry.id].append(_Letter(None, task, self.input, next(self.clock)))
+        # The task is a sheet nobody says anything about.
+        self.inbox[entry.id].append(_Letter(None, "", {**task, "content": self.input}, next(self.clock)))
         try:
             self.schedule()
             while self.tasks:
@@ -157,8 +189,8 @@ class _Run:
                 self.tasks.discard(item.task)
                 self.busy.discard(item.agent_id)
                 # Raises here whatever the turn raised: every event it emitted first is already out.
-                for recipient, reference, content in item.task.result():
-                    self.inbox[recipient].append(_Letter(item.agent_id, reference, content, next(self.clock)))
+                for recipient, message, handed in item.task.result():
+                    self.inbox[recipient].append(_Letter(item.agent_id, message, handed, next(self.clock)))
                 self.schedule()
         finally:
             unfinished = [task for task in self.tasks if not task.done()]
@@ -193,10 +225,15 @@ class _Run:
 
         last = self.office.exit
         assert last is not None  # check_runnable
-        if last.id not in self.outputs:
-            raise NoResult(f"The office went quiet before {last.name} produced a result.", last.id)
-        result = sheet(self.documents.next_document_id(), "Result")
-        return EventDraft(T.RUN_FINISHED, payload={"output": self.outputs[last.id], **result, "authorId": last.id})
+        paper = self.outcome
+        if paper is None:
+            raise NoResult(f"The office went quiet before {last.name} produced a sheet.", last.id)
+        # The result is that very sheet: it only gets an id here if no event has carried it yet.
+        document_id = paper.document_id or self.documents.next_document_id()
+        return EventDraft(
+            T.RUN_FINISHED,
+            payload={"output": paper.content, **sheet(document_id, paper.title, paper.version), "authorId": last.id},
+        )
 
     # -- who goes next
 
@@ -240,7 +277,7 @@ class _Run:
         letters = self.inbox[agent.id]
         sources = self.office.waits_for(agent.id)
         if sources:
-            # A join: one sheet from each of those it waits for, and nothing less starts it.
+            # A join: one hand-off from each of those it waits for, and nothing less starts it.
             first = [next((letter for letter in letters if letter.sender == source), None) for source in sources]
             if any(letter is None for letter in first):
                 return None
@@ -270,13 +307,21 @@ class _Run:
             raise BudgetExceeded(f"{agent.name} reached its limit of {self.budgets.max_turns_per_agent} turns.", agent.id)
         started = time.perf_counter()
 
+        # -- what arrives
         for letter in trigger.letters:
             if letter.sender is not None:
-                self.post(EventDraft(T.MESSAGE_RECEIVED, agent.id, letter.sender, {"content": letter.content, **letter.reference}))
+                self.post(EventDraft(T.MESSAGE_RECEIVED, agent.id, letter.sender, letter.payload))
         await asyncio.sleep(pace)
 
         taken = [(table_id, self.documents.documents[document_id]) for table_id, document_id in trigger.piles]
-        incoming = "\n".join([letter.content for letter in trigger.letters] + [as_text(document.latest.content) for _, document in taken])
+        held = [
+            HeldSheet(letter.sheet["documentId"], letter.sheet["version"], letter.sheet["title"], letter.sheet["content"], sender=letter.sender)
+            for letter in trigger.letters
+            if letter.sheet
+        ] + [HeldSheet(document.id, document.latest.version, document.latest.title, document.latest.content, table_id=table_id) for table_id, document in taken]
+        # As text: each thing said, then the sheet that came with it, in arrival order.
+        arrived = [text for letter in trigger.letters for text in (letter.message, as_text(letter.sheet["content"]) if letter.sheet else "") if text]
+        incoming = "\n".join(arrived + [as_text(document.latest.content) for _, document in taken])
         self.post(
             EventDraft(
                 T.AGENT_STARTED,
@@ -285,20 +330,20 @@ class _Run:
                     "input": incoming,
                     "role": agent.role,
                     "model": agent.model.to_wire(),
-                    "documentIds": [letter.reference["documentId"] for letter in trigger.letters],
+                    "documentIds": [letter.sheet["documentId"] for letter in trigger.letters if letter.sheet],
                 },
             )
         )
         context: list[ContextItem] = [{"kind": "system", "content": agent.system_prompt}]
+        for relation in self.workflow.relations:
+            if relation.subject == agent.id and relation.hint:
+                context.append({"kind": "hint", "relationId": relation.id, "sentence": office.sentence(relation), "content": relation.hint})
         for letter in trigger.letters:
-            context.append(
-                {
-                    "kind": "message",
-                    "from": letter.sender or "user",
-                    "content": letter.content,
-                    "documentId": letter.reference["documentId"],
-                }
-            )
+            who = letter.sender or "user"
+            if letter.message:
+                context.append({"kind": "message", "from": who, "content": letter.message})
+            if letter.sheet:
+                context.append({"kind": "document", "from": who, **letter.sheet})
 
         for table_id, document in taken:
             remaining = len(self.documents.on_table(table_id)) - 1
@@ -307,78 +352,105 @@ class _Run:
             context.append(self.as_context("document", table_id, document))
             await asyncio.sleep(pace)
 
-        for relation in office.of(agent.id, Verb.READS_TABLE):
-            on_it = self.documents.on_table(relation.object or "")
-            if not on_it:
-                continue  # nothing to walk over for
-            self.post(EventDraft(T.DOCUMENT_READ, agent.id, payload={"tableId": relation.object, "documentIds": on_it}))
-            context.append(
-                {
-                    "kind": "table",
-                    "tableId": relation.object,
-                    "documents": [self.as_context("document", relation.object, self.documents.documents[read]) for read in on_it],
-                }
-            )
-            await asyncio.sleep(pace)
+        # -- what it consults: fetched for the agent, in sentence order, before it is asked anything
+        calls = 0
+        for relation in office.consults(agent.id):
+            if relation.verb is Verb.READS_TABLE:
+                on_it = self.documents.on_table(relation.object or "")
+                if not on_it:
+                    continue  # nothing to walk over for
+                self.post(EventDraft(T.DOCUMENT_READ, agent.id, payload={"tableId": relation.object, "documentIds": on_it}))
+                context.append(
+                    {
+                        "kind": "table",
+                        "tableId": relation.object,
+                        "documents": [self.as_context("document", relation.object, self.documents.documents[read]) for read in on_it],
+                    }
+                )
+                await asyncio.sleep(pace)
+            else:
+                calls += 1
+                self.within_tool_budget(agent, calls)
+                tool = self.runtime.tools.get(relation.object or "")
+                argument = sole_argument(tool.schema)
+                assert argument is not None  # check_runnable
+                # No DECISION: nobody chose this. The workflow says so.
+                await self.call(agent, tool, {argument: incoming}, context, required=True)
 
-        result = await self.decide(agent, incoming, context)
-        output = result.output
-        self.outputs[agent.id] = output
+        # -- the task itself
+        messages = [Said(letter.sender, letter.message) for letter in trigger.letters if letter.sender is not None and letter.message]
+        result = await self.decide(agent, incoming, messages, held, context, calls)
+        paper = self.paper(agent, result, held)
+        if isinstance(result.sheet, Sheet):
+            context.append({"kind": "sheet", "title": paper.title, "content": paper.content})
         chosen = set(result.routes)
 
-        wrote = False
-        for relation, title, content in self.writes(agent, result, chosen):
-            if not self.spend(agent, relation):
-                continue
-            table = office.table(relation.object or "")
-            document_id, version = self.slot(table, title)
-            self.post(
-                EventDraft(
-                    T.DOCUMENT_WRITTEN,
-                    agent.id,
-                    payload={"tableId": table.id, **sheet(document_id, title, version), "content": content},
-                )
-            )
-            self.arrived.setdefault(document_id, next(self.clock))
-            context.append({"kind": "document_out", "to": table.id, "documentId": document_id, "content": content})
-            wrote = True
-            await asyncio.sleep(pace)
+        # -- what goes out: the required ways out in sentence order, then the ones it chose
+        ways = office.outputs(agent.id)
+        ways = [relation for relation in ways if relation.required] + [relation for relation in ways if not relation.required and relation.id in chosen]
+        if result.writes is not None:
+            # The agent said exactly what goes on which table: that replaces its sheet there.
+            tables = {relation.id: relation for relation in office.of(agent.id, Verb.WRITES_TABLE)}
+            for write in result.writes:
+                relation = tables.get(write.relation_id)
+                if relation is None:
+                    raise AgentRuntimeError(f"{agent.name} tried to write where it has no relation to write.", agent.id)
+                await self.write(agent, relation, write.title, write.content, context)
+            ways = [relation for relation in ways if relation.verb is Verb.SENDS_TO]
 
         outgoing: list[Outgoing] = []
-        sends = office.of(agent.id, Verb.SENDS_TO)
-        required = office.in_order(relation for relation in sends if relation.required)
-        optional = [relation for relation in sends if not relation.required and relation.id in chosen]
-        for relation in required + optional:
+        said: list[str] = []
+        handed = 0
+        for relation in ways:
+            if relation.verb is Verb.WRITES_TABLE:
+                if paper is not None:  # with no sheet there is nothing to put on a table
+                    await self.write(agent, relation, paper.title, paper.content, context)
+                continue
             if not self.spend(agent, relation):
                 continue
             target = office.agent(relation.object or "")
-            if relation.required:
-                kind, why = "handoff", f"Hand off to {target.name}."
-            else:
-                kind, why = "routing", result.rationale or f"Hand off to {target.name}."
-            context.append({"kind": "decision", "content": why})
-            self.post(
-                EventDraft(
-                    T.DECISION,
-                    agent.id,
-                    payload={"kind": kind, "summary": why, "target": target.id, "relationId": relation.id},
+            if not relation.required:
+                # Only a hand-off the agent chose is a decision. One that always happens is the
+                # workflow's doing: nobody decided it, so the log does not say anybody did.
+                why = result.rationale or f"Hand off to {target.name}."
+                context.append({"kind": "decision", "content": why})
+                self.post(
+                    EventDraft(
+                        T.DECISION,
+                        agent.id,
+                        payload={"kind": "routing", "summary": why, "target": target.id, "relationId": relation.id},
+                    )
                 )
-            )
             await asyncio.sleep(pace)
-            reference = sheet(self.documents.next_document_id(), f"Message to {target.name}")
-            context.append({"kind": "message_out", "to": target.id, "content": output, "documentId": reference["documentId"]})
-            self.post(EventDraft(T.MESSAGE_SENT, agent.id, target.id, {"content": output, **reference}))
-            outgoing.append((target.id, reference, output))
 
-        if not outgoing and not wrote:
-            context.append({"kind": "output", "content": output})
+            words = str(result.says.get(relation.id) or "")
+            going: dict[str, Any] | None = None
+            if paper is not None:
+                if handed == 0:
+                    # The first to be handed it gets the sheet itself.
+                    paper.document_id = paper.document_id or self.documents.next_document_id()
+                    going = {**sheet(paper.document_id, paper.title, paper.version), "content": paper.content}
+                else:
+                    # Everyone after that gets a photocopy: a sheet of its own that says where it came from.
+                    going = {**sheet(self.documents.next_document_id(), paper.title), "content": paper.content, "copyOf": paper.document_id}
+                handed += 1
+            letter = _Letter(agent.id, words, going, 0)
+            context.append({"kind": "message_out", "to": target.id, "content": words, **({"documentId": going["documentId"]} if going else {})})
+            self.post(EventDraft(T.MESSAGE_SENT, agent.id, target.id, letter.payload))
+            outgoing.append((target.id, words, going))
+            if words:
+                said.append(words)
+
+        if paper is not None and office.exit is not None and office.exit.id == agent.id:
+            self.outcome = paper
         # The full context snapshot makes each agent's state at hand-off part of the saved log.
         self.post(
             EventDraft(
                 T.AGENT_FINISHED,
                 agent.id,
                 payload={
-                    "output": output,
+                    # What it wrote, or passed on; failing that, what it said.
+                    "output": as_text(paper.content) if paper is not None else "\n".join(said),
                     "context": context,
                     "metrics": {"durationMs": elapsed_ms(started), "model": agent.model.name},
                 },
@@ -386,16 +458,26 @@ class _Run:
         )
         return outgoing
 
-    async def decide(self, agent: Agent, incoming: str, context: list[ContextItem]) -> TurnResult:
-        """Lets the agent's provider use its tools and reach a result."""
+    async def decide(
+        self,
+        agent: Agent,
+        incoming: str,
+        messages: list[Said],
+        held: list[HeldSheet],
+        context: list[ContextItem],
+        calls: int,
+    ) -> TurnResult:
+        """Lets the agent's provider call the tools it may use and say how its turn ends.
+
+        `calls` is how many tools were already consulted for it this turn: they count
+        towards the same limit.
+        """
         pace = self.runtime.pace
-        tools = {name: self.runtime.tools.get(name) for name in self.office.tools(agent.id)}
-        routes = []
-        for relation in self.workflow.relations:
-            if relation.subject != agent.id or relation.required or relation.verb not in OPTIONAL_VERBS:
-                continue
-            if self.rounds_left(relation):
-                routes.append(relation)
+        tools = {name: self.runtime.tools.get(name) for name in self.office.optional_tools(agent.id)}
+        outputs = []
+        for relation in self.office.outputs(agent.id):
+            if relation.required or self.rounds_left(relation):
+                outputs.append(relation)
             else:
                 self.report_exhausted(agent, relation)
 
@@ -403,80 +485,101 @@ class _Run:
             agent=agent,
             input=incoming,
             context=context,
+            messages=messages,
+            sheets=held,
             tools=list(tools.values()),
-            routes=routes,
-            writes=self.office.of(agent.id, Verb.WRITES_TABLE),
+            outputs=outputs,
             names=self.names,
         )
         steps = self.runtime.providers[agent.model.provider].run_turn(turn)
-        calls = 0
         try:
             step = await anext(steps, None)
             while isinstance(step, ToolRequest):
                 calls += 1
-                if calls > self.budgets.max_tool_calls_per_turn:
-                    raise BudgetExceeded(f"{agent.name} reached its limit of {self.budgets.max_tool_calls_per_turn} tool calls in one turn.", agent.id)
+                self.within_tool_budget(agent, calls)
                 tool = tools.get(step.tool)
                 if tool is None:
                     raise AgentRuntimeError(f"{agent.name} has no access to tool {step.tool!r}.", agent.id)
                 context.append({"kind": "decision", "content": step.rationale})
                 self.post(EventDraft(T.DECISION, agent.id, payload={"kind": "tool_selection", "summary": step.rationale, "tool": tool.name}))
                 await asyncio.sleep(pace)
-
-                context.append({"kind": "tool_call", "tool": tool.name, "arguments": step.arguments})
-                self.post(EventDraft(T.TOOL_CALL, agent.id, payload={"tool": tool.name, "arguments": step.arguments}))
-                tool_started = time.perf_counter()
-                await asyncio.sleep(pace)
+                outcome = await self.call(agent, tool, step.arguments, context, required=False)
                 try:
-                    outcome = await tool.execute(step.arguments)
-                except Exception as exc:
-                    raise ToolError(f"{tool.name} failed: {exc}", agent.id) from exc
-                summary = summarize(outcome)
-                context.append({"kind": "tool_result", "tool": tool.name, "result": outcome, "summary": summary})
-                self.post(
-                    EventDraft(
-                        T.TOOL_RESULT,
-                        agent.id,
-                        payload={
-                            "tool": tool.name,
-                            "result": outcome,
-                            "summary": summary,
-                            "metrics": {"latencyMs": elapsed_ms(tool_started)},
-                        },
-                    )
-                )
-                await asyncio.sleep(pace)
-                try:
-                    step = await steps.asend(ToolOutcome(tool.name, outcome, summary))
+                    step = await steps.asend(outcome)
                 except StopAsyncIteration:
                     step = None
         finally:
             await steps.aclose()
         if not isinstance(step, TurnResult):
-            raise AgentRuntimeError(f"{agent.name} ended its turn without saying what it produced.", agent.id)
+            raise AgentRuntimeError(f"{agent.name} ended its turn without saying how it ends.", agent.id)
         return step
 
-    def writes(self, agent: Agent, result: TurnResult, chosen: set[str]) -> Iterator[tuple[Relation, str, Any]]:
-        """The sheets this turn puts on tables: what the provider asked for, or its output on each table it must write on."""
-        relations = {relation.id: relation for relation in self.office.of(agent.id, Verb.WRITES_TABLE)}
-        if result.writes is not None:
-            for write in result.writes:
-                relation = relations.get(write.relation_id)
-                if relation is None:
-                    raise AgentRuntimeError(f"{agent.name} tried to write where it has no relation to write.", agent.id)
-                yield relation, write.title, write.content
-            return
-        for relation in self.office.in_order(relations.values()):
-            if relation.required or relation.id in chosen:
-                yield relation, self.title_for(agent, self.office.table(relation.object or ""), result.output), result.output
+    def within_tool_budget(self, agent: Agent, calls: int) -> None:
+        if calls > self.budgets.max_tool_calls_per_turn:
+            raise BudgetExceeded(f"{agent.name} reached its limit of {self.budgets.max_tool_calls_per_turn} tool calls in one turn.", agent.id)
 
-    @staticmethod
-    def title_for(agent: Agent, table: WorkflowTable, output: str) -> str:
-        script = (agent.model.model_extra or {}).get("script")
-        if isinstance(script, dict) and script.get("title"):
-            return str(script["title"])
-        # A shared table holds one sheet per title: by default, the table's own. A pile holds many.
-        return (table.name or table.id) if table.mode is TableMode.SHARED else title_of(output)
+    async def call(self, agent: Agent, tool: Tool, arguments: dict[str, Any], context: list[ContextItem], *, required: bool) -> ToolOutcome:
+        """One tool call, whoever wanted it. `required`: the workflow did, not the agent."""
+        pace = self.runtime.pace
+        marked = {"required": True} if required else {}
+        context.append({"kind": "tool_call", "tool": tool.name, "arguments": arguments, **marked})
+        self.post(EventDraft(T.TOOL_CALL, agent.id, payload={"tool": tool.name, "arguments": arguments, **marked}))
+        tool_started = time.perf_counter()
+        await asyncio.sleep(pace)
+        try:
+            outcome = await tool.execute(arguments)
+        except Exception as exc:
+            raise ToolError(f"{tool.name} failed: {exc}", agent.id) from exc
+        summary = summarize(outcome)
+        context.append({"kind": "tool_result", "tool": tool.name, "result": outcome, "summary": summary})
+        self.post(
+            EventDraft(
+                T.TOOL_RESULT,
+                agent.id,
+                payload={
+                    "tool": tool.name,
+                    "result": outcome,
+                    "summary": summary,
+                    "metrics": {"latencyMs": elapsed_ms(tool_started)},
+                },
+            )
+        )
+        await asyncio.sleep(pace)
+        return ToolOutcome(tool.name, outcome, summary)
+
+    def paper(self, agent: Agent, result: TurnResult, held: list[HeldSheet]) -> _Paper | None:
+        """The one sheet of the turn, and which document it is."""
+        produced = result.sheet
+        if produced is None:
+            return None
+        if isinstance(produced, str):
+            # A sheet it holds, passed on as it is: the same document, the same version.
+            kept = next((sheet_ for sheet_ in held if sheet_.id == produced), None)
+            if kept is None:
+                raise AgentRuntimeError(f"{agent.name} tried to pass on a sheet it does not hold ({produced}).", agent.id)
+            return _Paper(kept.title, kept.content, kept.id, kept.version)
+        # Same title, same document: the rule of shared tables holds in hands too.
+        same = next((sheet_ for sheet_ in held if sheet_.title == produced.title), None)
+        if same is not None:
+            return _Paper(produced.title, produced.content, same.id, self.documents.next_version(same.id))
+        return _Paper(produced.title, produced.content)
+
+    async def write(self, agent: Agent, relation: Relation, title: str, content: Any, context: list[ContextItem]) -> None:
+        """Puts a sheet on the table the relation names, if the relation has rounds left."""
+        if not self.spend(agent, relation):
+            return
+        table = self.office.table(relation.object or "")
+        document_id, version = self.slot(table, title)
+        self.post(
+            EventDraft(
+                T.DOCUMENT_WRITTEN,
+                agent.id,
+                payload={"tableId": table.id, **sheet(document_id, title, version), "content": content},
+            )
+        )
+        self.arrived.setdefault(document_id, next(self.clock))
+        context.append({"kind": "document_out", "to": table.id, "documentId": document_id, "content": content})
+        await asyncio.sleep(self.runtime.pace)
 
     def slot(self, table: WorkflowTable, title: str) -> tuple[str, int]:
         """Which document a write is: a new version of the sheet with that title on a shared table, or a new sheet."""

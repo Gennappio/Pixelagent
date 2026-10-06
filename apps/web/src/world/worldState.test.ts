@@ -2,16 +2,19 @@ import { describe, expect, it } from "vitest";
 import { EventAnimation, worldStateAt } from "../animation/EventAnimation";
 import { mapEventToActions } from "../animation/VisualEventMapper";
 import { foldDocuments, latestVersion } from "../protocol/documents";
-import { demoEvents, demoWorkflow, parallelEvents, parallelWorkflow, tablesEvents, tablesWorkflow } from "../testing/demoRun";
+import { demoEvents, demoWorkflow, indexOfEvent, oldRuns, parallelEvents, parallelWorkflow, sequenceOf, tablesEvents, tablesWorkflow } from "../testing/demoRun";
 import { buildLayout } from "./layout";
 import { actionDuration, applyAction, initialWorldState, SHEET_TRAVEL, sheetPosition, TABLE_DISTANCE } from "./worldState";
 
 const demoLayout = buildLayout(demoWorkflow);
 const officeLayout = buildLayout(tablesWorkflow);
+const parallelLayout = buildLayout(parallelWorkflow);
 const RUNS = [
   ["the demo", demoEvents, demoLayout],
   ["the run with tables", tablesEvents, officeLayout],
-  ["the run with two agents at once", parallelEvents, buildLayout(parallelWorkflow)],
+  ["the run with two agents at once", parallelEvents, parallelLayout],
+  // Logs from before a hand-off had words of its own must go on replaying as they did.
+  ...oldRuns.map((run) => [run.name, run.events, buildLayout(run.workflow)] as const),
 ] as const;
 
 describe("the world and the document registry agree", () => {
@@ -48,8 +51,33 @@ describe("the world and the document registry agree", () => {
   it("ends the demo with only the result in sight, in the out-tray", () => {
     const end = worldStateAt(demoEvents, demoEvents.length, demoLayout);
     expect(Object.values(end.documents)).toEqual([
-      { documentId: "doc_3", title: "Result", version: 1, place: { kind: "tray", tray: "out" } },
+      { documentId: "doc_2", title: "Email sent", version: 1, place: { kind: "tray", tray: "out" } },
     ]);
+  });
+
+  it("brings a filed sheet back into sight when it turns out to be the result", () => {
+    // Marta rewrote the sheet Luca handed her. Her turn over, it is filed and out of sight…
+    const last = parallelEvents.length;
+    expect(parallelEvents[last - 2].type).toBe("AGENT_FINISHED");
+    expect(worldStateAt(parallelEvents, last - 1, parallelLayout).documents).toEqual({});
+    // …and the run finishing puts that same sheet, in its new version, in the out-tray.
+    expect(Object.values(worldStateAt(parallelEvents, last, parallelLayout).documents)).toEqual([
+      { documentId: "doc_2", title: "Sales number", version: 2, place: { kind: "tray", tray: "out" } },
+    ]);
+  });
+
+  it("shows two sheets where one was photocopied, each with whoever was handed it", () => {
+    // After Anna's turn: the task is Luca's, its photocopy Gianni's.
+    const sheets = Object.values(worldStateAt(parallelEvents, sequenceOf(parallelEvents, "AGENT_FINISHED", "anna"), parallelLayout).documents).map((sheet) => [sheet.documentId, sheet.title, sheet.place]);
+    expect(sheets).toEqual([
+      ["doc_input", "Task", { kind: "hand", agentId: "luca" }],
+      ["doc_1", "Task", { kind: "hand", agentId: "gianni" }],
+    ]);
+  });
+
+  it("puts no sheet anywhere for words alone", () => {
+    const told = parallelEvents.findIndex((event) => event.type === "MESSAGE_SENT" && event.actorId === "gianni");
+    expect(worldStateAt(parallelEvents, told + 1, parallelLayout).documents).toEqual(worldStateAt(parallelEvents, told, parallelLayout).documents);
   });
 
   it("shows nothing for a log written before documents existed", () => {
@@ -64,9 +92,10 @@ describe("the world and the document registry agree", () => {
 });
 
 describe("a sheet changing hands", () => {
-  // Anna has just written doc_1 and is about to hand it to Luca (event 4).
-  const before = worldStateAt(demoEvents, 3, demoLayout);
-  const actions = mapEventToActions(demoEvents[3]);
+  // Anna holds the task and is about to hand it to Luca.
+  const handOff = indexOfEvent(demoEvents, "MESSAGE_SENT", "anna");
+  const before = worldStateAt(demoEvents, handOff, demoLayout);
+  const actions = mapEventToActions(demoEvents[handOff]);
 
   it("takes visualization time, and passes through the air between the two", () => {
     const animation = new EventAnimation(before, actions, demoLayout);
@@ -75,7 +104,7 @@ describe("a sheet changing hands", () => {
     while (!animation.done && frames < 10_000) {
       animation.advance(16);
       frames += 1;
-      const sheet = animation.applyTo(before).documents.doc_1;
+      const sheet = animation.applyTo(before).documents.doc_input;
       if (!sheet) continue;
       seen.add(sheet.transit ? "in the air" : `${sheet.place.kind}:${"agentId" in sheet.place ? sheet.place.agentId : ""}`);
       if (sheet.transit) {
@@ -84,13 +113,15 @@ describe("a sheet changing hands", () => {
       }
     }
     expect([...seen]).toEqual(["hand:anna", "in the air", "hand:luca"]);
-    expect(animation.applyTo(before).documents.doc_1.place).toEqual({ kind: "hand", agentId: "luca" });
+    expect(animation.applyTo(before).documents.doc_input.place).toEqual({ kind: "hand", agentId: "luca" });
   });
 
   it("travels with whoever holds it", () => {
-    const carrying = applyAction(before, actions[0], 1, demoLayout); // doc_1 in Anna's hand
+    expect(before.documents.doc_input.place).toEqual({ kind: "hand", agentId: "anna" });
+    const carrying = applyAction(before, actions[0], 1, demoLayout); // still in Anna's hand: she is not writing a new one
+    expect(carrying.documents).toEqual(before.documents);
     const halfway = applyAction(carrying, actions[1], 0.5, demoLayout); // Anna halfway to Luca
-    const sheet = halfway.documents.doc_1;
+    const sheet = halfway.documents.doc_input;
     const at = sheetPosition(halfway, demoLayout, sheet)!;
     const anna = halfway.agents.anna.position;
     expect(Math.abs(at.x - anna.x)).toBeLessThan(30);
@@ -100,7 +131,7 @@ describe("a sheet changing hands", () => {
 
   it("costs time only when the sheet actually has to move", () => {
     const hand = { type: "HAND_DOCUMENT", documentId: "doc_input", to: { kind: "hand", agentId: "luca" } } as const;
-    const holding = worldStateAt(demoEvents, 2, demoLayout); // doc_input in Anna's hand
+    const holding = worldStateAt(demoEvents, sequenceOf(demoEvents, "AGENT_STARTED", "anna"), demoLayout); // doc_input in Anna's hand
     expect(actionDuration(holding, hand, demoLayout)).toBe(SHEET_TRAVEL);
     expect(actionDuration(holding, { ...hand, to: { kind: "hand", agentId: "anna" } }, demoLayout)).toBe(0);
     expect(actionDuration(holding, { ...hand, documentId: "doc_unknown" }, demoLayout)).toBe(0);
@@ -108,22 +139,29 @@ describe("a sheet changing hands", () => {
   });
 
   it("files only what the finishing agent holds", () => {
-    const state = worldStateAt(demoEvents, 4, demoLayout); // Anna holds doc_input, Luca holds doc_1
-    const filed = applyAction(state, { type: "FILE_DOCUMENTS", agentId: "anna" }, 1, demoLayout);
+    // Luca has handed on the sheet he wrote: he still holds the task, Gianni holds the new sheet.
+    const state = worldStateAt(demoEvents, sequenceOf(demoEvents, "MESSAGE_SENT", "luca"), demoLayout);
+    expect(Object.values(state.documents).map((sheet) => [sheet.documentId, sheet.place])).toEqual([
+      ["doc_input", { kind: "hand", agentId: "luca" }],
+      ["doc_1", { kind: "hand", agentId: "gianni" }],
+    ]);
+    const filed = applyAction(state, { type: "FILE_DOCUMENTS", agentId: "luca" }, 1, demoLayout);
     expect(Object.keys(filed.documents)).toEqual(["doc_1"]);
-    expect(applyAction(filed, { type: "FILE_DOCUMENTS", agentId: "anna" }, 1, demoLayout)).toBe(filed);
+    expect(applyAction(filed, { type: "FILE_DOCUMENTS", agentId: "luca" }, 1, demoLayout)).toBe(filed);
+    // Anna, who passed her only sheet on, has nothing to file.
+    expect(applyAction(state, { type: "FILE_DOCUMENTS", agentId: "anna" }, 1, demoLayout)).toBe(state);
   });
 });
 
 describe("sheets on tables", () => {
   it("stacks a pile and spreads a shared table", () => {
-    const piled = worldStateAt(tablesEvents, 9, officeLayout); // the splitter has put two sheets on the pile
+    const piled = worldStateAt(tablesEvents, sequenceOf(tablesEvents, "AGENT_FINISHED", "sorter"), officeLayout); // the splitter has put two sheets on the pile
     const spot = (state: typeof piled, id: string) => sheetPosition(state, officeLayout, state.documents[id])!;
     const pile = officeLayout.tablePositions.todo;
     expect(spot(piled, "doc_2").x).toBe(pile.x);
     expect(spot(piled, "doc_3").x).toBe(pile.x);
     expect(spot(piled, "doc_3").y).toBeLessThan(spot(piled, "doc_2").y); // the second lies on top of the first
-    const written = worldStateAt(tablesEvents, 17, officeLayout); // Luca's first note is on the board
+    const written = worldStateAt(tablesEvents, sequenceOf(tablesEvents, "AGENT_FINISHED", "luca"), officeLayout); // Luca's first finding is on the board
     expect(Math.abs(spot(written, "doc_5").x - officeLayout.tablePositions.board.x)).toBeLessThan(30);
   });
 
@@ -132,11 +170,16 @@ describe("sheets on tables", () => {
       const state = worldStateAt(tablesEvents, count, officeLayout);
       return [state.documents.doc_5.version, sheetPosition(state, officeLayout, state.documents.doc_5)];
     };
-    expect(spotAfter(17)[0]).toBe(1);
-    expect(spotAfter(25)[0]).toBe(2);
-    expect(spotAfter(40)[0]).toBe(2);
-    expect(spotAfter(25)[1]).toEqual(spotAfter(17)[1]);
-    expect(spotAfter(40)[1]).toEqual(spotAfter(17)[1]);
+    // Luca writes on the pile of what is done and then on the board, twice: his 2nd and 4th writes are the board's.
+    const first = sequenceOf(tablesEvents, "DOCUMENT_WRITTEN", "luca", 1);
+    const second = sequenceOf(tablesEvents, "DOCUMENT_WRITTEN", "luca", 3);
+    expect([tablesEvents[first - 1].payload.tableId, tablesEvents[second - 1].payload.version]).toEqual(["board", 2]);
+    expect(spotAfter(first)[0]).toBe(1);
+    expect(spotAfter(second - 1)[0]).toBe(1);
+    expect(spotAfter(second)[0]).toBe(2);
+    expect(spotAfter(tablesEvents.length)[0]).toBe(2);
+    expect(spotAfter(second)[1]).toEqual(spotAfter(first)[1]);
+    expect(spotAfter(tablesEvents.length)[1]).toEqual(spotAfter(first)[1]);
   });
 
   it("stands the agent beside the table, facing it", () => {

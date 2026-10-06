@@ -13,13 +13,28 @@ export interface RouterRule {
   to: string;
 }
 
+/**
+ * What a scripted agent (the fake provider) does. {input}, {sheet} and {result} are filled in
+ * with everything that arrived, the sheets it holds and what its last tool returned.
+ */
+export interface AgentScript {
+  /** One line said to everyone it hands to, or a line per recipient, by agent id. */
+  says?: string | Record<string, string>;
+  /**
+   * The sheet it writes. False: none, it only talks. Absent: the result of its last tool if
+   * it used one, else the first sheet it holds, passed on as it is.
+   */
+  sheet?: { title?: string; content?: string } | false;
+  /** From before a hand-off had words of its own: the content of the sheet, with nothing said. */
+  message?: string;
+}
+
 export interface ModelConfiguration {
   /** fake: scripted, no API key. rule: follows a rule instead of asking a model. */
   provider: string;
   /** The model, or for a rule which one: router, splitter, collector. */
   name: string;
-  /** Fake provider: `message` is what it says, with {input} / {result}. `title` names the sheets it writes. */
-  script?: { message?: string; title?: string };
+  script?: AgentScript;
   /** Router rule. */
   rules?: RouterRule[];
   otherwise?: string;
@@ -81,8 +96,13 @@ export interface Relation {
   verb: Verb;
   /** An agent id, a tool name or a table id, depending on the verb. Absent for is_entry / is_exit. */
   object?: string;
-  /** Absent means true. False, for sends_to and writes_table, leaves it to the agent turn by turn. */
+  /**
+   * True: the runtime does it. False: the agent chooses, turn by turn. Absent means the
+   * verb's default: true for sends_to and writes_table, false for uses_tool, where true
+   * means the tool is consulted first. On the other verbs it means nothing.
+   */
   required?: boolean;
+  /** The position of the sentence among its subject's, ahead of the order they are written in. */
   order?: number;
   /** How many times the relation may fire in one run. Absent: 5 on a cycle, unlimited otherwise. */
   maxRounds?: number;
@@ -138,6 +158,8 @@ export interface ToolDescription {
   name: string;
   description: string;
   schema: Record<string, unknown>;
+  /** Whether an agent can consult it first: it has exactly one required argument, and it is text. */
+  consultable?: boolean;
 }
 
 /** What to call each agent and each table of a workflow, by id. */

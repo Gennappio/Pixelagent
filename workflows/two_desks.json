@@ -19,7 +19,10 @@
         "provider": "fake",
         "name": "scripted-v1",
         "script": {
-          "message": "The latest sales number is needed: find it, and warn management."
+          "says": {
+            "luca": "Find the latest sales number.",
+            "gianni": "Warn management that the number is coming."
+          }
         }
       },
       "systemPrompt": "Split the task between Luca and Gianni.",
@@ -35,7 +38,14 @@
       "instances": 1,
       "model": {
         "provider": "fake",
-        "name": "scripted-v1"
+        "name": "scripted-v1",
+        "script": {
+          "says": "Here is the number.",
+          "sheet": {
+            "title": "Sales number",
+            "content": "{result}"
+          }
+        }
       },
       "systemPrompt": "Find what is asked for.",
       "appearance": {
@@ -50,7 +60,11 @@
       "instances": 1,
       "model": {
         "provider": "fake",
-        "name": "scripted-v1"
+        "name": "scripted-v1",
+        "script": {
+          "says": "Management has been warned.",
+          "sheet": false
+        }
       },
       "systemPrompt": "Tell the right people.",
       "appearance": {
@@ -67,7 +81,10 @@
         "provider": "fake",
         "name": "scripted-v1",
         "script": {
-          "message": "Done.\n{input}"
+          "sheet": {
+            "title": "Sales number",
+            "content": "{sheet}\nManagement has been warned."
+          }
         }
       },
       "systemPrompt": "Put together what the others bring.",

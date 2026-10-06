@@ -87,6 +87,18 @@ export function DocumentInspector({ documentId, names }: Props) {
             )}
           </dd>
         </div>
+        {record.copyOf && (
+          <div className="field">
+            <dt>Photocopy of</dt>
+            <dd>
+              <button className="link" onClick={() => select({ kind: "document", documentId: record.copyOf! })}>
+                <span className="sheet-icon" />
+                {(registry.documents[record.copyOf] && latestVersion(registry.documents[record.copyOf]).title) || record.copyOf}
+              </button>{" "}
+              <span className="muted">handed to several at once: each got a sheet of their own</span>
+            </dd>
+          </div>
+        )}
         <div className="field">
           <dt>History</dt>
           <dd>

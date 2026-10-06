@@ -4,6 +4,9 @@ import type { AgentEvent } from "./events";
 // their own: every version travels inside the event that created it, and this module
 // reads them back out of the log.
 //
+// A sheet is what an agent writes; a message is what it says. Only the first is a document:
+// what is said when something is handed over lives in the MESSAGE_SENT event and nowhere else.
+//
 // The server folds the same events with the same rules
 // (apps/server/server/documents/registry.py). tests/fixtures holds logs both must read
 // identically. Change one side and the other has to follow.
@@ -62,6 +65,8 @@ export interface DocumentRecord {
   versions: DocumentVersion[];
   place: DocumentPlace;
   history: DocumentTouch[];
+  /** A photocopy: the sheet this one was copied from, when one sheet went to several agents. */
+  copyOf?: string;
 }
 
 export interface DocumentRegistry {
@@ -143,7 +148,7 @@ function version(
 ): DocumentRecord {
   let record = registry.documents[documentId];
   if (!record) {
-    record = { id: documentId, versions: [], place, history: [] };
+    record = compact({ id: documentId, versions: [], place, history: [], copyOf: text(payload.copyOf) });
     registry.documents[documentId] = record;
     registry.order.push(documentId);
     enter(registry, record);
@@ -197,6 +202,8 @@ function apply(registry: DocumentRegistry, event: AgentEvent): void {
       return;
     }
     case "MESSAGE_SENT": {
+      // A hand-off is something said, with or without a sheet. Only the sheet is a document:
+      // words alone leave the registry as it was.
       if (!documentId || !actor) return;
       const record = version(registry, documentId, payload, payload.content ?? "", actor, sequence, inHand(actor));
       move(registry, record, inHand(target ?? actor));

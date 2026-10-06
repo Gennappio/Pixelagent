@@ -1,10 +1,28 @@
 import { text, type AgentEvent } from "../protocol/events";
+import { handOff } from "../protocol/handoff";
 
+/** One hand-off the agent made or received: what was said, and the sheet that went with it, if any. */
 export interface AgentMessage {
   eventId: string;
   direction: "received" | "sent";
   peerId: string;
+  /** What was said. Empty when nothing was, and in logs where a hand-off was a sheet and nothing else. */
+  said: string;
+  sheet?: { documentId: string; title: string };
+  /** The hand-off in one line: the words, or failing that what the sheet is called or says. */
   content: string;
+}
+
+function messageOf(event: AgentEvent, direction: AgentMessage["direction"]): AgentMessage {
+  const { message, sheet, line } = handOff(event);
+  return {
+    eventId: event.id,
+    direction,
+    peerId: event.targetId ?? "",
+    said: message ?? "",
+    ...(sheet ? { sheet: { documentId: sheet.documentId, title: sheet.title } } : {}),
+    content: line,
+  };
 }
 
 export interface AgentToolCall {
@@ -59,15 +77,10 @@ export function agentRuntimeView(events: readonly AgentEvent[], agentId: string)
 
     switch (event.type) {
       case "MESSAGE_RECEIVED": {
-        const message: AgentMessage = {
-          eventId: event.id,
-          direction: "received",
-          peerId: event.targetId ?? "",
-          content: text(event, "content"),
-        };
+        const message = messageOf(event, "received");
         view.messages.push(message);
         view.lastReceived = message;
-        view.status = "Received a message";
+        view.status = message.sheet ? "Handed a sheet" : "Told something";
         break;
       }
       case "AGENT_STARTED": {
@@ -100,13 +113,8 @@ export function agentRuntimeView(events: readonly AgentEvent[], agentId: string)
         break;
       }
       case "MESSAGE_SENT":
-        view.messages.push({
-          eventId: event.id,
-          direction: "sent",
-          peerId: event.targetId ?? "",
-          content: text(event, "content"),
-        });
-        view.lastAction = `message to ${event.targetId}`;
+        view.messages.push(messageOf(event, "sent"));
+        view.lastAction = `hand-off to ${event.targetId}`;
         view.status = "Handing off";
         break;
       case "AGENT_FINISHED":

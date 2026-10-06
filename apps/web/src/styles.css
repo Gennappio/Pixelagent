@@ -838,10 +838,60 @@ button.hint:hover {
   gap: 6px;
 }
 
-.relations legend.minor {
-  margin-top: 6px;
-  padding: 0;
-  font-size: 11px;
+/* The three slots of a character: what arrives, what it consults, where its sheet goes. */
+.slot {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.slot + .slot {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+.slot h4 {
+  margin: 0;
+  font: 700 10px ui-monospace, monospace;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* A hand-off someone else makes to this agent: part of what arrives, theirs to change. */
+.relation.incoming {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  background: none;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+}
+
+.relation.incoming .sentence strong {
+  color: var(--muted);
+}
+
+.relation .sentence select.phrase {
+  width: auto;
+  padding: 1px 4px;
+}
+
+.relation-tools select {
+  width: auto;
+  padding: 1px 4px;
+}
+
+.form fieldset.script {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form fieldset.script button.link {
+  align-self: flex-start;
 }
 
 .relations p {

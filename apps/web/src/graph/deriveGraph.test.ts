@@ -52,8 +52,16 @@ describe("deriveGraph", () => {
   it("labels each edge with its verb's phrase and marks the ones left to the agent", () => {
     const optional = { ...demoWorkflow, relations: demoWorkflow.relations.map((relation) => (relation.id === "r2" ? { ...relation, required: false } : relation)) };
     const edge = deriveGraph(optional).edges.find((candidate) => candidate.id === "r2")!;
-    expect(edge).toMatchObject({ label: "hands a sheet to", optional: true });
+    expect(edge).toMatchObject({ label: "hands to", optional: true });
     expect(deriveGraph(demoWorkflow).edges.find((candidate) => candidate.id === "r2")!.optional).toBe(false);
+  });
+
+  it("draws a tool the agent may use as its choice, and one it consults first as something that always happens", () => {
+    const tool = (workflow: typeof demoWorkflow, subject: string) => deriveGraph(workflow).edges.find((edge) => edge.verb === "uses_tool" && edge.source === `agent:${subject}`)!;
+    // In the demo Luca chooses to search; on the supplier board the workflow has him consult the search first.
+    expect(tool(demoWorkflow, "luca")).toMatchObject({ label: "can use", optional: true });
+    expect(tool(tablesWorkflow, "luca")).toMatchObject({ label: "consults first", optional: false });
+    expect(tool(tablesWorkflow, "gianni")).toMatchObject({ label: "can use", optional: true });
   });
 
   it("draws an office nobody has wired up: agents, and nothing between them", () => {

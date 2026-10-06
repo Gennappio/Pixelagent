@@ -1,9 +1,10 @@
-import { relationsOf, verbInfo } from "../protocol/relations";
+import { canConsultFirst, isRequired, relationsOf, verbInfo } from "../protocol/relations";
 import {
   DEFAULT_ROOM_ID,
   SCHEMA_VERSION,
   type Agent,
   type Relation,
+  type ToolDescription,
   type Verb,
   type Workflow,
   type WorkflowTable,
@@ -111,14 +112,32 @@ export function removeTable(workflow: Workflow, tableId: string): Workflow {
 
 // -- relations
 
+/**
+ * How a sentence is said beyond subject, verb and object. `required` set against the verb's
+ * default says the other thing: "if it chooses" for handing over and writing, "consults
+ * first" for a tool. `tools` are the ones the server listed, which is how it is known
+ * whether a tool can be consulted first at all.
+ */
+export interface Saying {
+  required?: boolean;
+  tools?: readonly ToolDescription[];
+}
+
+/** A tool consulted first: only one the server says can be. */
+function consultsFirst(verb: Verb, how: Saying): boolean {
+  return verb === "uses_tool" && how.required === true;
+}
+
 /** What a new sentence "subject verb …" could end with: everything of the right kind not already said. */
-export function objectChoices(workflow: Workflow, subject: string, verb: Verb, tools: readonly string[]): { id: string; label: string }[] {
+export function objectChoices(workflow: Workflow, subject: string, verb: Verb, how: Saying = {}): { id: string; label: string }[] {
   const taken = new Set(relationsOf(workflow, subject, verb).map((relation) => relation.object));
   switch (verbInfo(verb).objectKind) {
     case "agent":
       return workflow.agents.filter((agent) => agent.id !== subject && !taken.has(agent.id)).map((agent) => ({ id: agent.id, label: agent.name }));
     case "tool":
-      return tools.filter((tool) => !taken.has(tool)).map((tool) => ({ id: tool, label: tool }));
+      return (how.tools ?? [])
+        .filter((tool) => !taken.has(tool.name) && (!consultsFirst(verb, how) || tool.consultable === true))
+        .map((tool) => ({ id: tool.name, label: tool.name }));
     case "table":
       return workflow.tables
         .filter((table) => suits(verb, table.mode) && !taken.has(table.id))
@@ -129,7 +148,7 @@ export function objectChoices(workflow: Workflow, subject: string, verb: Verb, t
 }
 
 /** Whether "subject verb object" is a sentence the workflow can take: the server applies the same rules. */
-export function canRelate(workflow: Workflow, subject: string, verb: Verb, object?: string): boolean {
+export function canRelate(workflow: Workflow, subject: string, verb: Verb, object?: string, how: Saying = {}): boolean {
   if (!workflow.agents.some((agent) => agent.id === subject)) return false;
   const kind = verbInfo(verb).objectKind;
   if (kind === null) return object === undefined && !relationsOf(workflow, subject, verb).length;
@@ -140,7 +159,8 @@ export function canRelate(workflow: Workflow, subject: string, verb: Verb, objec
     const table = workflow.tables.find((candidate) => candidate.id === object);
     return table !== undefined && suits(verb, table.mode);
   }
-  return true; // a tool: which ones exist is the server's knowledge
+  // A tool: which ones exist is the server's knowledge, and so is which can be consulted first.
+  return !consultsFirst(verb, how) || canConsultFirst(how.tools ?? [], object);
 }
 
 function nextRelationId(workflow: Workflow): string {
@@ -148,13 +168,19 @@ function nextRelationId(workflow: Workflow): string {
   return `r${Math.max(0, ...numbers) + 1}`;
 }
 
+/** `required` as a relation carries it: left unsaid when it is the verb's default, or means nothing on the verb. */
+function said(verb: Verb, required: boolean | undefined): { required?: boolean } {
+  const byDefault = verbInfo(verb).requiredByDefault;
+  return byDefault === undefined || required === undefined || required === byDefault ? {} : { required };
+}
+
 /**
  * Adds a sentence, after the ones the same agent already has. Only one agent can be the
  * entry and only one the exit: giving that to an agent takes it from whoever had it.
  */
-export function addRelation(workflow: Workflow, subject: string, verb: Verb, object?: string): Workflow {
-  if (!canRelate(workflow, subject, verb, object)) return workflow;
-  const relation: Relation = object === undefined ? { id: nextRelationId(workflow), subject, verb } : { id: nextRelationId(workflow), subject, verb, object };
+export function addRelation(workflow: Workflow, subject: string, verb: Verb, object?: string, how: Saying = {}): Workflow {
+  if (!canRelate(workflow, subject, verb, object, how)) return workflow;
+  const relation: Relation = { id: nextRelationId(workflow), subject, verb, ...(object === undefined ? {} : { object }), ...said(verb, how.required) };
   const kept = verbInfo(verb).objectKind === null ? workflow.relations.filter((other) => other.verb !== verb) : workflow.relations;
   const last = kept.map((other) => other.subject).lastIndexOf(subject);
   const at = last < 0 ? kept.length : last + 1;
@@ -166,18 +192,26 @@ export function removeRelation(workflow: Workflow, relationId: string): Workflow
   return { ...workflow, relations: workflow.relations.filter((relation) => relation.id !== relationId) };
 }
 
-/** Changes what a sentence adds to its subject, verb and object. Defaults are left unsaid, as on the wire. */
+/**
+ * Changes what a sentence adds to its subject, verb and object. Defaults are left unsaid, as
+ * on the wire. A tool that cannot be consulted first is not made to be: pass the server's
+ * `tools`, without which no tool can.
+ */
 export function updateRelation(
   workflow: Workflow,
   relationId: string,
   patch: { required?: boolean; maxRounds?: number | undefined; hint?: string },
+  tools: readonly ToolDescription[] = [],
 ): Workflow {
+  const current = workflow.relations.find((relation) => relation.id === relationId);
+  if (!current) return workflow;
+  if (consultsFirst(current.verb, patch) && !isRequired(current) && !canConsultFirst(tools, current.object)) return workflow;
   return {
     ...workflow,
     relations: workflow.relations.map((relation) => {
       if (relation.id !== relationId) return relation;
-      const next: Relation = { ...relation, ...patch };
-      if (next.required !== false || !verbInfo(next.verb).optional) delete next.required;
+      const { required: _was, ...rest } = { ...relation, ...patch };
+      const next: Relation = { ...rest, ...said(relation.verb, "required" in patch ? patch.required : relation.required) };
       if (!next.hint) delete next.hint;
       if (!next.maxRounds || next.maxRounds < 1) delete next.maxRounds;
       return next;
@@ -185,13 +219,19 @@ export function updateRelation(
   };
 }
 
-/** Moves a sentence up (-1) or down (+1) among the sentences of the same agent: their order is the order they happen in. */
+/**
+ * Moves a sentence up (-1) or down (+1) among the sentences of the same agent in the same
+ * slot. That is where order means something: what is consulted enters the context in that
+ * order, and what goes out happens in it.
+ */
 export function moveRelation(workflow: Workflow, relationId: string, direction: -1 | 1): Workflow {
   const index = workflow.relations.findIndex((relation) => relation.id === relationId);
   if (index < 0) return workflow;
-  const subject = workflow.relations[index].subject;
+  const { subject, verb } = workflow.relations[index];
+  const slot = verbInfo(verb).slot;
+  const beside = (relation: Relation) => relation.subject === subject && verbInfo(relation.verb).slot === slot;
   let other = index + direction;
-  while (other >= 0 && other < workflow.relations.length && workflow.relations[other].subject !== subject) other += direction;
+  while (other >= 0 && other < workflow.relations.length && !beside(workflow.relations[other])) other += direction;
   if (other < 0 || other >= workflow.relations.length) return workflow;
   const relations = [...workflow.relations];
   [relations[index], relations[other]] = [relations[other], relations[index]];

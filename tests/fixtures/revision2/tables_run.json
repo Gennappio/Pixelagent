@@ -27,11 +27,7 @@
             "provider": "fake",
             "name": "scripted-v1",
             "script": {
-              "says": "Research these two suppliers.",
-              "sheet": {
-                "title": "Suppliers",
-                "content": "Supplier A\nSupplier B"
-              }
+              "message": "Supplier A\nSupplier B"
             }
           },
           "systemPrompt": "Name the suppliers to research, one per line.",
@@ -62,13 +58,7 @@
           "instances": 1,
           "model": {
             "provider": "fake",
-            "name": "scripted-v1",
-            "script": {
-              "sheet": {
-                "title": "Finding",
-                "content": "{result}"
-              }
-            }
+            "name": "scripted-v1"
           },
           "systemPrompt": "Research the supplier on the sheet you take.",
           "appearance": {
@@ -98,13 +88,7 @@
           "instances": 1,
           "model": {
             "provider": "fake",
-            "name": "scripted-v1",
-            "script": {
-              "sheet": {
-                "title": "Email sent",
-                "content": "{result}"
-              }
-            }
+            "name": "scripted-v1"
           },
           "systemPrompt": "Deliver results to the right people.",
           "appearance": {
@@ -163,8 +147,7 @@
           "id": "r5",
           "subject": "luca",
           "verb": "uses_tool",
-          "object": "web_search",
-          "required": true
+          "object": "web_search"
         },
         {
           "id": "r6",
@@ -249,11 +232,7 @@
           "provider": "fake",
           "name": "scripted-v1",
           "script": {
-            "says": "Research these two suppliers.",
-            "sheet": {
-              "title": "Suppliers",
-              "content": "Supplier A\nSupplier B"
-            }
+            "message": "Supplier A\nSupplier B"
           }
         },
         "documentIds": [
@@ -266,21 +245,34 @@
       "runId": "run_supplier_board",
       "sequence": 3,
       "timestamp": "2026-10-05T14:31:02.000Z",
-      "type": "MESSAGE_SENT",
+      "type": "DECISION",
       "actorId": "anna",
-      "targetId": "sorter",
       "payload": {
-        "message": "Research these two suppliers.",
-        "documentId": "doc_1",
-        "version": 1,
-        "title": "Suppliers",
-        "content": "Supplier A\nSupplier B"
+        "kind": "handoff",
+        "summary": "Hand off to Sorter.",
+        "target": "sorter",
+        "relationId": "r2"
       }
     },
     {
       "id": "evt_0004",
       "runId": "run_supplier_board",
       "sequence": 4,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "MESSAGE_SENT",
+      "actorId": "anna",
+      "targetId": "sorter",
+      "payload": {
+        "content": "Supplier A\nSupplier B",
+        "documentId": "doc_1",
+        "version": 1,
+        "title": "Message to Sorter"
+      }
+    },
+    {
+      "id": "evt_0005",
+      "runId": "run_supplier_board",
+      "sequence": 5,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_FINISHED",
       "actorId": "anna",
@@ -292,22 +284,19 @@
             "content": "Name the suppliers to research, one per line."
           },
           {
-            "kind": "document",
+            "kind": "message",
             "from": "user",
-            "documentId": "doc_input",
-            "version": 1,
-            "title": "Task",
-            "content": "Research our two suppliers and send management what you find."
+            "content": "Research our two suppliers and send management what you find.",
+            "documentId": "doc_input"
           },
           {
-            "kind": "sheet",
-            "title": "Suppliers",
-            "content": "Supplier A\nSupplier B"
+            "kind": "decision",
+            "content": "Hand off to Sorter."
           },
           {
             "kind": "message_out",
             "to": "sorter",
-            "content": "Research these two suppliers.",
+            "content": "Supplier A\nSupplier B",
             "documentId": "doc_1"
           }
         ],
@@ -318,30 +307,29 @@
       }
     },
     {
-      "id": "evt_0005",
+      "id": "evt_0006",
       "runId": "run_supplier_board",
-      "sequence": 5,
+      "sequence": 6,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "MESSAGE_RECEIVED",
       "actorId": "sorter",
       "targetId": "anna",
       "payload": {
-        "message": "Research these two suppliers.",
+        "content": "Supplier A\nSupplier B",
         "documentId": "doc_1",
         "version": 1,
-        "title": "Suppliers",
-        "content": "Supplier A\nSupplier B"
+        "title": "Message to Sorter"
       }
     },
     {
-      "id": "evt_0006",
+      "id": "evt_0007",
       "runId": "run_supplier_board",
-      "sequence": 6,
+      "sequence": 7,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_STARTED",
       "actorId": "sorter",
       "payload": {
-        "input": "Research these two suppliers.\nSupplier A\nSupplier B",
+        "input": "Supplier A\nSupplier B",
         "role": "Splits a list into sheets",
         "model": {
           "provider": "rule",
@@ -353,9 +341,9 @@
       }
     },
     {
-      "id": "evt_0007",
+      "id": "evt_0008",
       "runId": "run_supplier_board",
-      "sequence": 7,
+      "sequence": 8,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DOCUMENT_WRITTEN",
       "actorId": "sorter",
@@ -368,9 +356,9 @@
       }
     },
     {
-      "id": "evt_0008",
+      "id": "evt_0009",
       "runId": "run_supplier_board",
-      "sequence": 8,
+      "sequence": 9,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DOCUMENT_WRITTEN",
       "actorId": "sorter",
@@ -383,14 +371,14 @@
       }
     },
     {
-      "id": "evt_0009",
+      "id": "evt_0010",
       "runId": "run_supplier_board",
-      "sequence": 9,
+      "sequence": 10,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_FINISHED",
       "actorId": "sorter",
       "payload": {
-        "output": "",
+        "output": "2 sheets written.",
         "context": [
           {
             "kind": "system",
@@ -399,15 +387,8 @@
           {
             "kind": "message",
             "from": "anna",
-            "content": "Research these two suppliers."
-          },
-          {
-            "kind": "document",
-            "from": "anna",
-            "documentId": "doc_1",
-            "version": 1,
-            "title": "Suppliers",
-            "content": "Supplier A\nSupplier B"
+            "content": "Supplier A\nSupplier B",
+            "documentId": "doc_1"
           },
           {
             "kind": "document_out",
@@ -429,9 +410,9 @@
       }
     },
     {
-      "id": "evt_0010",
+      "id": "evt_0011",
       "runId": "run_supplier_board",
-      "sequence": 10,
+      "sequence": 11,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_STARTED",
       "actorId": "luca",
@@ -440,21 +421,15 @@
         "role": "Researcher",
         "model": {
           "provider": "fake",
-          "name": "scripted-v1",
-          "script": {
-            "sheet": {
-              "title": "Finding",
-              "content": "{result}"
-            }
-          }
+          "name": "scripted-v1"
         },
         "documentIds": []
       }
     },
     {
-      "id": "evt_0011",
+      "id": "evt_0012",
       "runId": "run_supplier_board",
-      "sequence": 11,
+      "sequence": 12,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DOCUMENT_TAKEN",
       "actorId": "luca",
@@ -465,9 +440,22 @@
       }
     },
     {
-      "id": "evt_0012",
+      "id": "evt_0013",
       "runId": "run_supplier_board",
-      "sequence": 12,
+      "sequence": 13,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "DECISION",
+      "actorId": "luca",
+      "payload": {
+        "kind": "tool_selection",
+        "summary": "Use web_search to handle the request.",
+        "tool": "web_search"
+      }
+    },
+    {
+      "id": "evt_0014",
+      "runId": "run_supplier_board",
+      "sequence": 14,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "TOOL_CALL",
       "actorId": "luca",
@@ -475,14 +463,13 @@
         "tool": "web_search",
         "arguments": {
           "query": "Supplier A"
-        },
-        "required": true
+        }
       }
     },
     {
-      "id": "evt_0013",
+      "id": "evt_0015",
       "runId": "run_supplier_board",
-      "sequence": 13,
+      "sequence": 15,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "TOOL_RESULT",
       "actorId": "luca",
@@ -504,9 +491,9 @@
       }
     },
     {
-      "id": "evt_0014",
+      "id": "evt_0016",
       "runId": "run_supplier_board",
-      "sequence": 14,
+      "sequence": 16,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DOCUMENT_WRITTEN",
       "actorId": "luca",
@@ -514,14 +501,14 @@
         "tableId": "done",
         "documentId": "doc_4",
         "version": 1,
-        "title": "Finding",
+        "title": "Supplier A: reliable, 30 days delivery",
         "content": "Supplier A: reliable, 30 days delivery"
       }
     },
     {
-      "id": "evt_0015",
+      "id": "evt_0017",
       "runId": "run_supplier_board",
-      "sequence": 15,
+      "sequence": 17,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DOCUMENT_WRITTEN",
       "actorId": "luca",
@@ -529,14 +516,14 @@
         "tableId": "board",
         "documentId": "doc_5",
         "version": 1,
-        "title": "Finding",
+        "title": "Board",
         "content": "Supplier A: reliable, 30 days delivery"
       }
     },
     {
-      "id": "evt_0016",
+      "id": "evt_0018",
       "runId": "run_supplier_board",
-      "sequence": 16,
+      "sequence": 18,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_FINISHED",
       "actorId": "luca",
@@ -556,12 +543,15 @@
             "content": "Supplier A"
           },
           {
+            "kind": "decision",
+            "content": "Use web_search to handle the request."
+          },
+          {
             "kind": "tool_call",
             "tool": "web_search",
             "arguments": {
               "query": "Supplier A"
-            },
-            "required": true
+            }
           },
           {
             "kind": "tool_result",
@@ -576,11 +566,6 @@
               ]
             },
             "summary": "Supplier A: reliable, 30 days delivery"
-          },
-          {
-            "kind": "sheet",
-            "title": "Finding",
-            "content": "Supplier A: reliable, 30 days delivery"
           },
           {
             "kind": "document_out",
@@ -602,9 +587,9 @@
       }
     },
     {
-      "id": "evt_0017",
+      "id": "evt_0019",
       "runId": "run_supplier_board",
-      "sequence": 17,
+      "sequence": 19,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_STARTED",
       "actorId": "luca",
@@ -613,21 +598,15 @@
         "role": "Researcher",
         "model": {
           "provider": "fake",
-          "name": "scripted-v1",
-          "script": {
-            "sheet": {
-              "title": "Finding",
-              "content": "{result}"
-            }
-          }
+          "name": "scripted-v1"
         },
         "documentIds": []
       }
     },
     {
-      "id": "evt_0018",
+      "id": "evt_0020",
       "runId": "run_supplier_board",
-      "sequence": 18,
+      "sequence": 20,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DOCUMENT_TAKEN",
       "actorId": "luca",
@@ -638,9 +617,22 @@
       }
     },
     {
-      "id": "evt_0019",
+      "id": "evt_0021",
       "runId": "run_supplier_board",
-      "sequence": 19,
+      "sequence": 21,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "DECISION",
+      "actorId": "luca",
+      "payload": {
+        "kind": "tool_selection",
+        "summary": "Use web_search to handle the request.",
+        "tool": "web_search"
+      }
+    },
+    {
+      "id": "evt_0022",
+      "runId": "run_supplier_board",
+      "sequence": 22,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "TOOL_CALL",
       "actorId": "luca",
@@ -648,14 +640,13 @@
         "tool": "web_search",
         "arguments": {
           "query": "Supplier B"
-        },
-        "required": true
+        }
       }
     },
     {
-      "id": "evt_0020",
+      "id": "evt_0023",
       "runId": "run_supplier_board",
-      "sequence": 20,
+      "sequence": 23,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "TOOL_RESULT",
       "actorId": "luca",
@@ -677,9 +668,9 @@
       }
     },
     {
-      "id": "evt_0021",
+      "id": "evt_0024",
       "runId": "run_supplier_board",
-      "sequence": 21,
+      "sequence": 24,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DOCUMENT_WRITTEN",
       "actorId": "luca",
@@ -687,14 +678,14 @@
         "tableId": "done",
         "documentId": "doc_6",
         "version": 1,
-        "title": "Finding",
+        "title": "Supplier B: cheaper, 60 days delivery",
         "content": "Supplier B: cheaper, 60 days delivery"
       }
     },
     {
-      "id": "evt_0022",
+      "id": "evt_0025",
       "runId": "run_supplier_board",
-      "sequence": 22,
+      "sequence": 25,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DOCUMENT_WRITTEN",
       "actorId": "luca",
@@ -702,14 +693,14 @@
         "tableId": "board",
         "documentId": "doc_5",
         "version": 2,
-        "title": "Finding",
+        "title": "Board",
         "content": "Supplier B: cheaper, 60 days delivery"
       }
     },
     {
-      "id": "evt_0023",
+      "id": "evt_0026",
       "runId": "run_supplier_board",
-      "sequence": 23,
+      "sequence": 26,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_FINISHED",
       "actorId": "luca",
@@ -729,12 +720,15 @@
             "content": "Supplier B"
           },
           {
+            "kind": "decision",
+            "content": "Use web_search to handle the request."
+          },
+          {
             "kind": "tool_call",
             "tool": "web_search",
             "arguments": {
               "query": "Supplier B"
-            },
-            "required": true
+            }
           },
           {
             "kind": "tool_result",
@@ -749,11 +743,6 @@
               ]
             },
             "summary": "Supplier B: cheaper, 60 days delivery"
-          },
-          {
-            "kind": "sheet",
-            "title": "Finding",
-            "content": "Supplier B: cheaper, 60 days delivery"
           },
           {
             "kind": "document_out",
@@ -775,9 +764,9 @@
       }
     },
     {
-      "id": "evt_0024",
+      "id": "evt_0027",
       "runId": "run_supplier_board",
-      "sequence": 24,
+      "sequence": 27,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_STARTED",
       "actorId": "stapler",
@@ -792,9 +781,9 @@
       }
     },
     {
-      "id": "evt_0025",
+      "id": "evt_0028",
       "runId": "run_supplier_board",
-      "sequence": 25,
+      "sequence": 28,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DOCUMENT_TAKEN",
       "actorId": "stapler",
@@ -805,9 +794,9 @@
       }
     },
     {
-      "id": "evt_0026",
+      "id": "evt_0029",
       "runId": "run_supplier_board",
-      "sequence": 26,
+      "sequence": 29,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DOCUMENT_TAKEN",
       "actorId": "stapler",
@@ -818,25 +807,38 @@
       }
     },
     {
-      "id": "evt_0027",
+      "id": "evt_0030",
       "runId": "run_supplier_board",
-      "sequence": 27,
+      "sequence": 30,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "DECISION",
+      "actorId": "stapler",
+      "payload": {
+        "kind": "handoff",
+        "summary": "Hand off to Gianni.",
+        "target": "gianni",
+        "relationId": "r9"
+      }
+    },
+    {
+      "id": "evt_0031",
+      "runId": "run_supplier_board",
+      "sequence": 31,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "MESSAGE_SENT",
       "actorId": "stapler",
       "targetId": "gianni",
       "payload": {
-        "message": "",
+        "content": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery",
         "documentId": "doc_7",
         "version": 1,
-        "title": "Researched",
-        "content": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery"
+        "title": "Message to Gianni"
       }
     },
     {
-      "id": "evt_0028",
+      "id": "evt_0032",
       "runId": "run_supplier_board",
-      "sequence": 28,
+      "sequence": 32,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_FINISHED",
       "actorId": "stapler",
@@ -852,7 +854,7 @@
             "from": "done",
             "documentId": "doc_4",
             "version": 1,
-            "title": "Finding",
+            "title": "Supplier A: reliable, 30 days delivery",
             "content": "Supplier A: reliable, 30 days delivery"
           },
           {
@@ -860,18 +862,17 @@
             "from": "done",
             "documentId": "doc_6",
             "version": 1,
-            "title": "Finding",
+            "title": "Supplier B: cheaper, 60 days delivery",
             "content": "Supplier B: cheaper, 60 days delivery"
           },
           {
-            "kind": "sheet",
-            "title": "Researched",
-            "content": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery"
+            "kind": "decision",
+            "content": "Hand off to Gianni."
           },
           {
             "kind": "message_out",
             "to": "gianni",
-            "content": "",
+            "content": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery",
             "documentId": "doc_7"
           }
         ],
@@ -882,25 +883,24 @@
       }
     },
     {
-      "id": "evt_0029",
+      "id": "evt_0033",
       "runId": "run_supplier_board",
-      "sequence": 29,
+      "sequence": 33,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "MESSAGE_RECEIVED",
       "actorId": "gianni",
       "targetId": "stapler",
       "payload": {
-        "message": "",
+        "content": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery",
         "documentId": "doc_7",
         "version": 1,
-        "title": "Researched",
-        "content": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery"
+        "title": "Message to Gianni"
       }
     },
     {
-      "id": "evt_0030",
+      "id": "evt_0034",
       "runId": "run_supplier_board",
-      "sequence": 30,
+      "sequence": 34,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_STARTED",
       "actorId": "gianni",
@@ -909,13 +909,7 @@
         "role": "Communication",
         "model": {
           "provider": "fake",
-          "name": "scripted-v1",
-          "script": {
-            "sheet": {
-              "title": "Email sent",
-              "content": "{result}"
-            }
-          }
+          "name": "scripted-v1"
         },
         "documentIds": [
           "doc_7"
@@ -923,9 +917,9 @@
       }
     },
     {
-      "id": "evt_0031",
+      "id": "evt_0035",
       "runId": "run_supplier_board",
-      "sequence": 31,
+      "sequence": 35,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DOCUMENT_READ",
       "actorId": "gianni",
@@ -937,9 +931,9 @@
       }
     },
     {
-      "id": "evt_0032",
+      "id": "evt_0036",
       "runId": "run_supplier_board",
-      "sequence": 32,
+      "sequence": 36,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DECISION",
       "actorId": "gianni",
@@ -950,9 +944,9 @@
       }
     },
     {
-      "id": "evt_0033",
+      "id": "evt_0037",
       "runId": "run_supplier_board",
-      "sequence": 33,
+      "sequence": 37,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "TOOL_CALL",
       "actorId": "gianni",
@@ -966,9 +960,9 @@
       }
     },
     {
-      "id": "evt_0034",
+      "id": "evt_0038",
       "runId": "run_supplier_board",
-      "sequence": 34,
+      "sequence": 38,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "TOOL_RESULT",
       "actorId": "gianni",
@@ -987,9 +981,9 @@
       }
     },
     {
-      "id": "evt_0035",
+      "id": "evt_0039",
       "runId": "run_supplier_board",
-      "sequence": 35,
+      "sequence": 39,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_FINISHED",
       "actorId": "gianni",
@@ -1001,12 +995,10 @@
             "content": "Deliver results to the right people."
           },
           {
-            "kind": "document",
+            "kind": "message",
             "from": "stapler",
-            "documentId": "doc_7",
-            "version": 1,
-            "title": "Researched",
-            "content": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery"
+            "content": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery",
+            "documentId": "doc_7"
           },
           {
             "kind": "table",
@@ -1017,7 +1009,7 @@
                 "from": "board",
                 "documentId": "doc_5",
                 "version": 2,
-                "title": "Finding",
+                "title": "Board",
                 "content": "Supplier B: cheaper, 60 days delivery"
               }
             ]
@@ -1047,8 +1039,7 @@
             "summary": "Email sent to management@example.com"
           },
           {
-            "kind": "sheet",
-            "title": "Email sent",
+            "kind": "output",
             "content": "Email sent to management@example.com"
           }
         ],
@@ -1059,16 +1050,16 @@
       }
     },
     {
-      "id": "evt_0036",
+      "id": "evt_0040",
       "runId": "run_supplier_board",
-      "sequence": 36,
+      "sequence": 40,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "RUN_FINISHED",
       "payload": {
         "output": "Email sent to management@example.com",
         "documentId": "doc_8",
         "version": 1,
-        "title": "Email sent",
+        "title": "Result",
         "authorId": "gianni"
       }
     }
@@ -1100,7 +1091,7 @@
             "agentId": "anna"
           },
           {
-            "sequence": 4,
+            "sequence": 5,
             "action": "filed",
             "agentId": "anna"
           }
@@ -1111,10 +1102,10 @@
         "versions": [
           {
             "version": 1,
-            "title": "Suppliers",
+            "title": "Message to Sorter",
             "content": "Supplier A\nSupplier B",
             "authorId": "anna",
-            "createdSequence": 3
+            "createdSequence": 4
           }
         ],
         "place": {
@@ -1123,20 +1114,20 @@
         },
         "history": [
           {
-            "sequence": 3,
+            "sequence": 4,
             "action": "handed",
             "agentId": "anna",
             "peerId": "sorter",
             "version": 1
           },
           {
-            "sequence": 5,
+            "sequence": 6,
             "action": "received",
             "agentId": "sorter",
             "peerId": "anna"
           },
           {
-            "sequence": 9,
+            "sequence": 10,
             "action": "filed",
             "agentId": "sorter"
           }
@@ -1149,42 +1140,6 @@
             "version": 1,
             "title": "Supplier A",
             "content": "Supplier A",
-            "authorId": "sorter",
-            "createdSequence": 7
-          }
-        ],
-        "place": {
-          "kind": "filed",
-          "agentId": "luca"
-        },
-        "history": [
-          {
-            "sequence": 7,
-            "action": "written",
-            "agentId": "sorter",
-            "tableId": "todo",
-            "version": 1
-          },
-          {
-            "sequence": 11,
-            "action": "taken",
-            "agentId": "luca",
-            "tableId": "todo"
-          },
-          {
-            "sequence": 16,
-            "action": "filed",
-            "agentId": "luca"
-          }
-        ]
-      },
-      "doc_3": {
-        "id": "doc_3",
-        "versions": [
-          {
-            "version": 1,
-            "title": "Supplier B",
-            "content": "Supplier B",
             "authorId": "sorter",
             "createdSequence": 8
           }
@@ -1202,13 +1157,49 @@
             "version": 1
           },
           {
-            "sequence": 18,
+            "sequence": 12,
             "action": "taken",
             "agentId": "luca",
             "tableId": "todo"
           },
           {
-            "sequence": 23,
+            "sequence": 18,
+            "action": "filed",
+            "agentId": "luca"
+          }
+        ]
+      },
+      "doc_3": {
+        "id": "doc_3",
+        "versions": [
+          {
+            "version": 1,
+            "title": "Supplier B",
+            "content": "Supplier B",
+            "authorId": "sorter",
+            "createdSequence": 9
+          }
+        ],
+        "place": {
+          "kind": "filed",
+          "agentId": "luca"
+        },
+        "history": [
+          {
+            "sequence": 9,
+            "action": "written",
+            "agentId": "sorter",
+            "tableId": "todo",
+            "version": 1
+          },
+          {
+            "sequence": 20,
+            "action": "taken",
+            "agentId": "luca",
+            "tableId": "todo"
+          },
+          {
+            "sequence": 26,
             "action": "filed",
             "agentId": "luca"
           }
@@ -1219,10 +1210,10 @@
         "versions": [
           {
             "version": 1,
-            "title": "Finding",
+            "title": "Supplier A: reliable, 30 days delivery",
             "content": "Supplier A: reliable, 30 days delivery",
             "authorId": "luca",
-            "createdSequence": 14
+            "createdSequence": 16
           }
         ],
         "place": {
@@ -1231,20 +1222,20 @@
         },
         "history": [
           {
-            "sequence": 14,
+            "sequence": 16,
             "action": "written",
             "agentId": "luca",
             "tableId": "done",
             "version": 1
           },
           {
-            "sequence": 25,
+            "sequence": 28,
             "action": "taken",
             "agentId": "stapler",
             "tableId": "done"
           },
           {
-            "sequence": 28,
+            "sequence": 32,
             "action": "filed",
             "agentId": "stapler"
           }
@@ -1255,17 +1246,17 @@
         "versions": [
           {
             "version": 1,
-            "title": "Finding",
+            "title": "Board",
             "content": "Supplier A: reliable, 30 days delivery",
             "authorId": "luca",
-            "createdSequence": 15
+            "createdSequence": 17
           },
           {
             "version": 2,
-            "title": "Finding",
+            "title": "Board",
             "content": "Supplier B: cheaper, 60 days delivery",
             "authorId": "luca",
-            "createdSequence": 22
+            "createdSequence": 25
           }
         ],
         "place": {
@@ -1274,21 +1265,21 @@
         },
         "history": [
           {
-            "sequence": 15,
+            "sequence": 17,
             "action": "written",
             "agentId": "luca",
             "tableId": "board",
             "version": 1
           },
           {
-            "sequence": 22,
+            "sequence": 25,
             "action": "written",
             "agentId": "luca",
             "tableId": "board",
             "version": 2
           },
           {
-            "sequence": 31,
+            "sequence": 35,
             "action": "read",
             "agentId": "gianni",
             "tableId": "board"
@@ -1300,10 +1291,10 @@
         "versions": [
           {
             "version": 1,
-            "title": "Finding",
+            "title": "Supplier B: cheaper, 60 days delivery",
             "content": "Supplier B: cheaper, 60 days delivery",
             "authorId": "luca",
-            "createdSequence": 21
+            "createdSequence": 24
           }
         ],
         "place": {
@@ -1312,20 +1303,20 @@
         },
         "history": [
           {
-            "sequence": 21,
+            "sequence": 24,
             "action": "written",
             "agentId": "luca",
             "tableId": "done",
             "version": 1
           },
           {
-            "sequence": 26,
+            "sequence": 29,
             "action": "taken",
             "agentId": "stapler",
             "tableId": "done"
           },
           {
-            "sequence": 28,
+            "sequence": 32,
             "action": "filed",
             "agentId": "stapler"
           }
@@ -1336,10 +1327,10 @@
         "versions": [
           {
             "version": 1,
-            "title": "Researched",
+            "title": "Message to Gianni",
             "content": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery",
             "authorId": "stapler",
-            "createdSequence": 27
+            "createdSequence": 31
           }
         ],
         "place": {
@@ -1348,20 +1339,20 @@
         },
         "history": [
           {
-            "sequence": 27,
+            "sequence": 31,
             "action": "handed",
             "agentId": "stapler",
             "peerId": "gianni",
             "version": 1
           },
           {
-            "sequence": 29,
+            "sequence": 33,
             "action": "received",
             "agentId": "gianni",
             "peerId": "stapler"
           },
           {
-            "sequence": 35,
+            "sequence": 39,
             "action": "filed",
             "agentId": "gianni"
           }
@@ -1372,10 +1363,10 @@
         "versions": [
           {
             "version": 1,
-            "title": "Email sent",
+            "title": "Result",
             "content": "Email sent to management@example.com",
             "authorId": "gianni",
-            "createdSequence": 36
+            "createdSequence": 40
           }
         ],
         "place": {
@@ -1384,7 +1375,7 @@
         },
         "history": [
           {
-            "sequence": 36,
+            "sequence": 40,
             "action": "delivered",
             "agentId": "gianni"
           }
@@ -1427,6 +1418,12 @@
       "doc_input": {
         "kind": "hand",
         "agentId": "anna"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "hand",
+        "agentId": "anna"
       },
       "doc_1": {
         "kind": "hand",
@@ -1525,6 +1522,24 @@
       "doc_2": {
         "kind": "table",
         "tableId": "todo"
+      },
+      "doc_3": {
+        "kind": "table",
+        "tableId": "todo"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "hand",
+        "agentId": "luca"
       },
       "doc_3": {
         "kind": "table",
@@ -1675,6 +1690,32 @@
       "doc_3": {
         "kind": "table",
         "tableId": "todo"
+      },
+      "doc_4": {
+        "kind": "table",
+        "tableId": "done"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "hand",
+        "agentId": "luca"
       },
       "doc_4": {
         "kind": "table",
@@ -1911,6 +1952,36 @@
       "doc_6": {
         "kind": "table",
         "tableId": "done"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "hand",
+        "agentId": "stapler"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      },
+      "doc_6": {
+        "kind": "hand",
+        "agentId": "stapler"
       }
     },
     {

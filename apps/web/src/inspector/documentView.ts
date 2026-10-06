@@ -32,7 +32,8 @@ export function describeTouch(touch: DocumentTouch, names: Names): string {
     case "picked_up":
       return `${agent} picked it up`;
     case "handed":
-      return `${agent} handed it to ${peer}`;
+      // A sheet rewritten in someone's hands goes on as a new version of itself.
+      return touch.version && touch.version > 1 ? `${agent} handed version ${touch.version} to ${peer}` : `${agent} handed it to ${peer}`;
     case "received":
       return `${agent} received it from ${peer}`;
     case "filed":
