@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { EVENT_COLOR } from "../debugger/Timeline";
 import { documentsTouchedBy, foldDocuments, latestVersion } from "../protocol/documents";
 import type { AgentEvent } from "../protocol/events";
-import { toolLabel, type Agent } from "../protocol/workflow";
+import { relationsOf, sentence } from "../protocol/relations";
+import type { Agent, Workflow } from "../protocol/workflow";
 import { backToBuild } from "../state/actions";
 import { replay, useReplay } from "../state/replayStore";
 import { useUiStore } from "../state/uiStore";
@@ -15,6 +16,8 @@ const TABS = ["Configuration", "Runtime", "Messages", "Tools", "Sheets", "Trace"
 type Tab = (typeof TABS)[number];
 
 interface Props {
+  /** The workflow on screen: the one being built, or the one a run executed. */
+  workflow: Workflow;
   /** The agent being built, or the one that ran when a run is on screen. */
   agent: Agent;
   /** Build mode: the configuration can be changed and there is no run to inspect. */
@@ -36,7 +39,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /** The configuration a run was started with. Read-only: only build mode edits the workflow. */
-function ConfigurationAsExecuted({ agent }: { agent: Agent }) {
+function ConfigurationAsExecuted({ workflow, agent }: { workflow: Workflow; agent: Agent }) {
+  const does = relationsOf(workflow, agent.id);
   return (
     <>
       <p className="muted">As executed in this run.</p>
@@ -55,7 +59,20 @@ function ConfigurationAsExecuted({ agent }: { agent: Agent }) {
             <div className="message">{agent.model.script.message}</div>
           </Field>
         )}
-        <Field label="Tools">{agent.tools.map((tool) => toolLabel(tool.name)).join(", ") || "—"}</Field>
+        <Field label="What it does">
+          {does.length === 0 ? (
+            "—"
+          ) : (
+            <ul className="list">
+              {does.map((relation) => (
+                <li key={relation.id}>
+                  {sentence(workflow, relation)}
+                  {relation.required === false && <span className="muted"> (if it chooses)</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Field>
         <Field label="Sprite">{spriteFor(agent.appearance.sprite).label}</Field>
         <Field label="Id">
           <span className="muted">{agent.id}</span>
@@ -98,7 +115,7 @@ function EventRow({ event }: { event: AgentEvent }) {
   );
 }
 
-export function AgentInspector({ agent, editable, names }: Props) {
+export function AgentInspector({ workflow, agent, editable, names }: Props) {
   const [tab, setTab] = useState<Tab>("Runtime");
   const select = useUiStore((state) => state.select);
   const { position } = useReplay();
@@ -135,7 +152,7 @@ export function AgentInspector({ agent, editable, names }: Props) {
         ))}
       </nav>
 
-      {tab === "Configuration" && <ConfigurationAsExecuted agent={agent} />}
+      {tab === "Configuration" && <ConfigurationAsExecuted workflow={workflow} agent={agent} />}
 
       {tab === "Runtime" && <Runtime agent={agent} view={view} names={names} />}
 

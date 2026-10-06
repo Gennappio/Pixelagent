@@ -8,11 +8,31 @@ from server.workflow.models import Workflow
 
 
 class AgentRuntimeError(Exception):
-    """A failure attributable to one agent. Surfaces as a RUN_ERROR event."""
+    """A failure of a run, attributable to one agent when `actor_id` is set.
+
+    Surfaces as a RUN_ERROR event whose `errorType` is the name of the class, so each
+    way a run can fail has its own subclass.
+    """
 
     def __init__(self, message: str, actor_id: str | None = None) -> None:
         super().__init__(message)
         self.actor_id = actor_id
+
+
+class ToolError(AgentRuntimeError):
+    """A tool raised while an agent was using it."""
+
+
+class BudgetExceeded(AgentRuntimeError):
+    """The run hit one of the workflow's limits."""
+
+
+class Deadlock(AgentRuntimeError):
+    """Nothing can happen any more, and an agent is still waiting for a sheet that will not come."""
+
+
+class NoResult(AgentRuntimeError):
+    """Nothing can happen any more, and the exit agent never produced a result."""
 
 
 class AgentRuntime(ABC):

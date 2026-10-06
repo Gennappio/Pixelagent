@@ -75,21 +75,25 @@ describe("foldDocuments", () => {
   });
 
   it("keeps every version of a shared sheet, latest last", () => {
-    const status = foldDocuments(tablesEvents).documents.doc_3;
-    expect(status.versions.map((entry) => [entry.version, entry.authorId])).toEqual([
-      [1, "anna"],
-      [2, "luca"],
-      [3, "luca"],
+    const board = foldDocuments(tablesEvents).documents.doc_5;
+    expect(board.versions.map((entry) => [entry.version, entry.authorId, entry.createdSequence])).toEqual([
+      [1, "luca", 17],
+      [2, "luca", 25],
     ]);
-    expect(latestVersion(status).content).toContain("2 of 2 suppliers researched.");
-    expect(status.place).toEqual(onTable("board"));
+    expect(latestVersion(board).content).toBe("Supplier B: cheaper, 60 days delivery");
+    expect(board.versions[0].content).toBe("Supplier A: reliable, 30 days delivery");
+    expect(board.place).toEqual(onTable("board"));
   });
 
   it("takes sheets off a pile one at a time", () => {
     const pileAfter = (count: number) => foldDocuments(tablesEvents.slice(0, count)).tables.todo;
-    expect(pileAfter(5)).toEqual(["doc_1", "doc_2"]);
-    expect(pileAfter(9)).toEqual(["doc_2"]);
-    expect(pileAfter(16)).toEqual([]);
+    expect(pileAfter(9)).toEqual(["doc_2", "doc_3"]);
+    expect(pileAfter(12)).toEqual(["doc_3"]);
+    expect(pileAfter(20)).toEqual([]);
+    // The collector empties its pile in one go.
+    const doneAfter = (count: number) => foldDocuments(tablesEvents.slice(0, count)).tables.done;
+    expect(doneAfter(26)).toEqual(["doc_4", "doc_6"]);
+    expect(doneAfter(29)).toEqual([]);
   });
 
   it("does not record the same version twice", () => {
@@ -140,7 +144,10 @@ describe("foldDocuments", () => {
 describe("documentsTouchedBy", () => {
   it("lists what an agent wrote, held, read or was handed", () => {
     const registry = foldDocuments(tablesEvents);
-    expect(documentsTouchedBy(registry, "anna").map((record) => record.id)).toEqual(["doc_input", "doc_1", "doc_2", "doc_3"]);
-    expect(documentsTouchedBy(registry, "gianni").map((record) => record.id)).toEqual(["doc_3", "doc_4", "doc_5"]);
+    const touched = (agentId: string) => documentsTouchedBy(registry, agentId).map((record) => record.id);
+    expect(touched("anna")).toEqual(["doc_input", "doc_1"]);
+    expect(touched("luca")).toEqual(["doc_2", "doc_3", "doc_4", "doc_5", "doc_6"]);
+    expect(touched("stapler")).toEqual(["doc_4", "doc_6", "doc_7"]);
+    expect(touched("gianni")).toEqual(["doc_5", "doc_7", "doc_8"]);
   });
 });

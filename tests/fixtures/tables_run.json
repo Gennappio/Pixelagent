@@ -1,67 +1,96 @@
 {
   "run": {
-    "id": "run_tables",
-    "workflowId": "tables_demo",
+    "id": "run_supplier_board",
+    "workflowId": "supplier_board",
     "status": "finished",
-    "input": "Research two suppliers and keep the board up to date.",
+    "input": "Research our two suppliers and send management what you find.",
     "createdAt": "2026-10-05T14:31:02.000Z",
     "finishedAt": "2026-10-05T14:31:02.000Z",
     "workflow": {
+      "schemaVersion": 2,
       "name": "Supplier board",
-      "input": "Research two suppliers and keep the board up to date.",
+      "input": "Research our two suppliers and send management what you find.",
+      "rooms": [
+        {
+          "id": "office",
+          "name": "Office"
+        }
+      ],
       "agents": [
         {
           "id": "anna",
           "name": "Anna",
           "role": "Manager",
+          "roomId": "office",
+          "instances": 1,
           "model": {
             "provider": "fake",
             "name": "scripted-v1",
             "script": {
-              "message": "Find the latest sales number."
+              "message": "Supplier A\nSupplier B"
             }
           },
-          "systemPrompt": "Coordinate the task and delegate work.",
-          "tools": [],
+          "systemPrompt": "Name the suppliers to research, one per line.",
           "appearance": {
             "sprite": "agent_female_01"
+          }
+        },
+        {
+          "id": "sorter",
+          "name": "Sorter",
+          "role": "Splits a list into sheets",
+          "roomId": "office",
+          "instances": 1,
+          "model": {
+            "provider": "rule",
+            "name": "splitter"
+          },
+          "systemPrompt": "",
+          "appearance": {
+            "sprite": "agent_robot_01"
           }
         },
         {
           "id": "luca",
           "name": "Luca",
           "role": "Researcher",
+          "roomId": "office",
+          "instances": 1,
           "model": {
             "provider": "fake",
-            "name": "scripted-v1",
-            "script": {
-              "message": "Send this result to management: {result}"
-            }
+            "name": "scripted-v1"
           },
-          "systemPrompt": "Research the request using the available tools and report the findings.",
-          "tools": [
-            {
-              "name": "web_search"
-            }
-          ],
+          "systemPrompt": "Research the supplier on the sheet you take.",
           "appearance": {
             "sprite": "agent_male_01"
+          }
+        },
+        {
+          "id": "stapler",
+          "name": "Stapler",
+          "role": "Gathers what is done",
+          "roomId": "office",
+          "instances": 1,
+          "model": {
+            "provider": "rule",
+            "name": "collector"
+          },
+          "systemPrompt": "",
+          "appearance": {
+            "sprite": "agent_robot_01"
           }
         },
         {
           "id": "gianni",
           "name": "Gianni",
           "role": "Communication",
+          "roomId": "office",
+          "instances": 1,
           "model": {
             "provider": "fake",
             "name": "scripted-v1"
           },
           "systemPrompt": "Deliver results to the right people.",
-          "tools": [
-            {
-              "name": "send_email"
-            }
-          ],
           "appearance": {
             "sprite": "agent_male_02"
           }
@@ -72,124 +101,118 @@
           "id": "todo",
           "name": "To research",
           "mode": "pile",
-          "scope": "room"
+          "scope": "room",
+          "roomId": "office"
+        },
+        {
+          "id": "done",
+          "name": "Researched",
+          "mode": "pile",
+          "scope": "room",
+          "roomId": "office"
         },
         {
           "id": "board",
           "name": "Board",
           "mode": "shared",
-          "scope": "room"
+          "scope": "room",
+          "roomId": "office"
         }
       ],
-      "nodes": [
+      "relations": [
         {
-          "id": "start",
-          "type": "start",
-          "position": {
-            "x": 40.0,
-            "y": 40.0
-          }
+          "id": "r1",
+          "subject": "anna",
+          "verb": "is_entry"
         },
         {
-          "id": "node_anna",
-          "type": "agent",
-          "agentId": "anna",
-          "position": {
-            "x": 0.0,
-            "y": 140.0
-          }
+          "id": "r2",
+          "subject": "anna",
+          "verb": "sends_to",
+          "object": "sorter"
         },
         {
-          "id": "node_luca",
-          "type": "agent",
-          "agentId": "luca",
-          "position": {
-            "x": 0.0,
-            "y": 280.0
-          }
+          "id": "r3",
+          "subject": "sorter",
+          "verb": "writes_table",
+          "object": "todo"
         },
         {
-          "id": "node_search",
-          "type": "tool",
-          "tool": "web_search",
-          "position": {
-            "x": 280.0,
-            "y": 290.0
-          }
+          "id": "r4",
+          "subject": "luca",
+          "verb": "takes_from_table",
+          "object": "todo"
         },
         {
-          "id": "node_gianni",
-          "type": "agent",
-          "agentId": "gianni",
-          "position": {
-            "x": 0.0,
-            "y": 420.0
-          }
+          "id": "r5",
+          "subject": "luca",
+          "verb": "uses_tool",
+          "object": "web_search"
         },
         {
-          "id": "node_email",
-          "type": "tool",
-          "tool": "send_email",
-          "position": {
-            "x": 280.0,
-            "y": 430.0
-          }
+          "id": "r6",
+          "subject": "luca",
+          "verb": "writes_table",
+          "object": "done"
         },
         {
-          "id": "end",
-          "type": "end",
-          "position": {
-            "x": 40.0,
-            "y": 560.0
-          }
+          "id": "r7",
+          "subject": "luca",
+          "verb": "writes_table",
+          "object": "board"
+        },
+        {
+          "id": "r8",
+          "subject": "stapler",
+          "verb": "takes_from_table",
+          "object": "done"
+        },
+        {
+          "id": "r9",
+          "subject": "stapler",
+          "verb": "sends_to",
+          "object": "gianni"
+        },
+        {
+          "id": "r10",
+          "subject": "gianni",
+          "verb": "reads_table",
+          "object": "board"
+        },
+        {
+          "id": "r11",
+          "subject": "gianni",
+          "verb": "uses_tool",
+          "object": "send_email"
+        },
+        {
+          "id": "r12",
+          "subject": "gianni",
+          "verb": "is_exit"
         }
       ],
-      "edges": [
-        {
-          "id": "e_start_anna",
-          "source": "start",
-          "target": "node_anna"
-        },
-        {
-          "id": "e_anna_luca",
-          "source": "node_anna",
-          "target": "node_luca"
-        },
-        {
-          "id": "e_luca_search",
-          "source": "node_luca",
-          "target": "node_search"
-        },
-        {
-          "id": "e_luca_gianni",
-          "source": "node_luca",
-          "target": "node_gianni"
-        },
-        {
-          "id": "e_gianni_email",
-          "source": "node_gianni",
-          "target": "node_email"
-        },
-        {
-          "id": "e_gianni_end",
-          "source": "node_gianni",
-          "target": "end"
-        }
-      ],
-      "id": "tables_demo"
+      "budgets": {
+        "maxEvents": 5000,
+        "maxTurnsPerAgent": 100,
+        "maxToolCallsPerTurn": 10
+      },
+      "layout": {
+        "positions": {}
+      },
+      "id": "supplier_board"
     }
   },
   "events": [
     {
       "id": "evt_0001",
-      "runId": "run_tables",
+      "runId": "run_supplier_board",
       "sequence": 1,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "RUN_STARTED",
       "payload": {
-        "workflowId": "tables_demo",
+        "workflowId": "supplier_board",
         "workflowName": "Supplier board",
-        "input": "Research two suppliers and keep the board up to date.",
+        "input": "Research our two suppliers and send management what you find.",
         "documentId": "doc_input",
         "version": 1,
         "title": "Task"
@@ -197,14 +220,21 @@
     },
     {
       "id": "evt_0002",
-      "runId": "run_tables",
+      "runId": "run_supplier_board",
       "sequence": 2,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_STARTED",
       "actorId": "anna",
       "payload": {
-        "input": "Research two suppliers and keep the board up to date.",
+        "input": "Research our two suppliers and send management what you find.",
         "role": "Manager",
+        "model": {
+          "provider": "fake",
+          "name": "scripted-v1",
+          "script": {
+            "message": "Supplier A\nSupplier B"
+          }
+        },
         "documentIds": [
           "doc_input"
         ]
@@ -212,70 +242,64 @@
     },
     {
       "id": "evt_0003",
-      "runId": "run_tables",
+      "runId": "run_supplier_board",
       "sequence": 3,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DECISION",
       "actorId": "anna",
       "payload": {
-        "kind": "routing",
-        "summary": "Two suppliers: one sheet each on the pile."
+        "kind": "handoff",
+        "summary": "Hand off to Sorter.",
+        "target": "sorter",
+        "relationId": "r2"
       }
     },
     {
       "id": "evt_0004",
-      "runId": "run_tables",
+      "runId": "run_supplier_board",
       "sequence": 4,
       "timestamp": "2026-10-05T14:31:02.000Z",
-      "type": "DOCUMENT_WRITTEN",
+      "type": "MESSAGE_SENT",
       "actorId": "anna",
+      "targetId": "sorter",
       "payload": {
-        "tableId": "todo",
+        "content": "Supplier A\nSupplier B",
         "documentId": "doc_1",
         "version": 1,
-        "title": "Supplier A",
-        "content": "Research supplier A."
+        "title": "Message to Sorter"
       }
     },
     {
       "id": "evt_0005",
-      "runId": "run_tables",
+      "runId": "run_supplier_board",
       "sequence": 5,
-      "timestamp": "2026-10-05T14:31:02.000Z",
-      "type": "DOCUMENT_WRITTEN",
-      "actorId": "anna",
-      "payload": {
-        "tableId": "todo",
-        "documentId": "doc_2",
-        "version": 1,
-        "title": "Supplier B",
-        "content": "Research supplier B."
-      }
-    },
-    {
-      "id": "evt_0006",
-      "runId": "run_tables",
-      "sequence": 6,
-      "timestamp": "2026-10-05T14:31:02.000Z",
-      "type": "DOCUMENT_WRITTEN",
-      "actorId": "anna",
-      "payload": {
-        "tableId": "board",
-        "documentId": "doc_3",
-        "version": 1,
-        "title": "Status",
-        "content": "0 of 2 suppliers researched."
-      }
-    },
-    {
-      "id": "evt_0007",
-      "runId": "run_tables",
-      "sequence": 7,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_FINISHED",
       "actorId": "anna",
       "payload": {
-        "output": "Two sheets are on the pile.",
+        "output": "Supplier A\nSupplier B",
+        "context": [
+          {
+            "kind": "system",
+            "content": "Name the suppliers to research, one per line."
+          },
+          {
+            "kind": "message",
+            "from": "user",
+            "content": "Research our two suppliers and send management what you find.",
+            "documentId": "doc_input"
+          },
+          {
+            "kind": "decision",
+            "content": "Hand off to Sorter."
+          },
+          {
+            "kind": "message_out",
+            "to": "sorter",
+            "content": "Supplier A\nSupplier B",
+            "documentId": "doc_1"
+          }
+        ],
         "metrics": {
           "durationMs": 0,
           "model": "scripted-v1"
@@ -283,63 +307,169 @@
       }
     },
     {
-      "id": "evt_0008",
-      "runId": "run_tables",
-      "sequence": 8,
+      "id": "evt_0006",
+      "runId": "run_supplier_board",
+      "sequence": 6,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "MESSAGE_RECEIVED",
+      "actorId": "sorter",
+      "targetId": "anna",
+      "payload": {
+        "content": "Supplier A\nSupplier B",
+        "documentId": "doc_1",
+        "version": 1,
+        "title": "Message to Sorter"
+      }
+    },
+    {
+      "id": "evt_0007",
+      "runId": "run_supplier_board",
+      "sequence": 7,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_STARTED",
-      "actorId": "luca",
+      "actorId": "sorter",
       "payload": {
-        "input": "",
-        "role": "Researcher",
-        "documentIds": []
+        "input": "Supplier A\nSupplier B",
+        "role": "Splits a list into sheets",
+        "model": {
+          "provider": "rule",
+          "name": "splitter"
+        },
+        "documentIds": [
+          "doc_1"
+        ]
+      }
+    },
+    {
+      "id": "evt_0008",
+      "runId": "run_supplier_board",
+      "sequence": 8,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "DOCUMENT_WRITTEN",
+      "actorId": "sorter",
+      "payload": {
+        "tableId": "todo",
+        "documentId": "doc_2",
+        "version": 1,
+        "title": "Supplier A",
+        "content": "Supplier A"
       }
     },
     {
       "id": "evt_0009",
-      "runId": "run_tables",
+      "runId": "run_supplier_board",
       "sequence": 9,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "DOCUMENT_WRITTEN",
+      "actorId": "sorter",
+      "payload": {
+        "tableId": "todo",
+        "documentId": "doc_3",
+        "version": 1,
+        "title": "Supplier B",
+        "content": "Supplier B"
+      }
+    },
+    {
+      "id": "evt_0010",
+      "runId": "run_supplier_board",
+      "sequence": 10,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "AGENT_FINISHED",
+      "actorId": "sorter",
+      "payload": {
+        "output": "2 sheets written.",
+        "context": [
+          {
+            "kind": "system",
+            "content": ""
+          },
+          {
+            "kind": "message",
+            "from": "anna",
+            "content": "Supplier A\nSupplier B",
+            "documentId": "doc_1"
+          },
+          {
+            "kind": "document_out",
+            "to": "todo",
+            "documentId": "doc_2",
+            "content": "Supplier A"
+          },
+          {
+            "kind": "document_out",
+            "to": "todo",
+            "documentId": "doc_3",
+            "content": "Supplier B"
+          }
+        ],
+        "metrics": {
+          "durationMs": 0,
+          "model": "splitter"
+        }
+      }
+    },
+    {
+      "id": "evt_0011",
+      "runId": "run_supplier_board",
+      "sequence": 11,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "AGENT_STARTED",
+      "actorId": "luca",
+      "payload": {
+        "input": "Supplier A",
+        "role": "Researcher",
+        "model": {
+          "provider": "fake",
+          "name": "scripted-v1"
+        },
+        "documentIds": []
+      }
+    },
+    {
+      "id": "evt_0012",
+      "runId": "run_supplier_board",
+      "sequence": 12,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DOCUMENT_TAKEN",
       "actorId": "luca",
       "payload": {
         "tableId": "todo",
-        "documentId": "doc_1",
+        "documentId": "doc_2",
         "remaining": 1
       }
     },
     {
-      "id": "evt_0010",
-      "runId": "run_tables",
-      "sequence": 10,
+      "id": "evt_0013",
+      "runId": "run_supplier_board",
+      "sequence": 13,
       "timestamp": "2026-10-05T14:31:02.000Z",
-      "type": "DOCUMENT_READ",
+      "type": "DECISION",
       "actorId": "luca",
       "payload": {
-        "tableId": "board",
-        "documentIds": [
-          "doc_3"
-        ]
+        "kind": "tool_selection",
+        "summary": "Use web_search to handle the request.",
+        "tool": "web_search"
       }
     },
     {
-      "id": "evt_0011",
-      "runId": "run_tables",
-      "sequence": 11,
+      "id": "evt_0014",
+      "runId": "run_supplier_board",
+      "sequence": 14,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "TOOL_CALL",
       "actorId": "luca",
       "payload": {
         "tool": "web_search",
         "arguments": {
-          "query": "supplier A"
+          "query": "Supplier A"
         }
       }
     },
     {
-      "id": "evt_0012",
-      "runId": "run_tables",
-      "sequence": 12,
+      "id": "evt_0015",
+      "runId": "run_supplier_board",
+      "sequence": 15,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "TOOL_RESULT",
       "actorId": "luca",
@@ -347,7 +477,12 @@
         "tool": "web_search",
         "result": {
           "summary": "Supplier A: reliable, 30 days delivery",
-          "results": []
+          "results": [
+            {
+              "title": "Supplier A: reliable, 30 days delivery",
+              "url": "https://intranet.example/suppliers"
+            }
+          ]
         },
         "summary": "Supplier A: reliable, 30 days delivery",
         "metrics": {
@@ -356,29 +491,95 @@
       }
     },
     {
-      "id": "evt_0013",
-      "runId": "run_tables",
-      "sequence": 13,
+      "id": "evt_0016",
+      "runId": "run_supplier_board",
+      "sequence": 16,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "DOCUMENT_WRITTEN",
+      "actorId": "luca",
+      "payload": {
+        "tableId": "done",
+        "documentId": "doc_4",
+        "version": 1,
+        "title": "Supplier A: reliable, 30 days delivery",
+        "content": "Supplier A: reliable, 30 days delivery"
+      }
+    },
+    {
+      "id": "evt_0017",
+      "runId": "run_supplier_board",
+      "sequence": 17,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DOCUMENT_WRITTEN",
       "actorId": "luca",
       "payload": {
         "tableId": "board",
-        "documentId": "doc_3",
-        "version": 2,
-        "title": "Status",
-        "content": "1 of 2 suppliers researched.\nA: reliable, 30 days delivery."
+        "documentId": "doc_5",
+        "version": 1,
+        "title": "Board",
+        "content": "Supplier A: reliable, 30 days delivery"
       }
     },
     {
-      "id": "evt_0014",
-      "runId": "run_tables",
-      "sequence": 14,
+      "id": "evt_0018",
+      "runId": "run_supplier_board",
+      "sequence": 18,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_FINISHED",
       "actorId": "luca",
       "payload": {
-        "output": "Supplier A is on the board.",
+        "output": "Supplier A: reliable, 30 days delivery",
+        "context": [
+          {
+            "kind": "system",
+            "content": "Research the supplier on the sheet you take."
+          },
+          {
+            "kind": "document",
+            "from": "todo",
+            "documentId": "doc_2",
+            "version": 1,
+            "title": "Supplier A",
+            "content": "Supplier A"
+          },
+          {
+            "kind": "decision",
+            "content": "Use web_search to handle the request."
+          },
+          {
+            "kind": "tool_call",
+            "tool": "web_search",
+            "arguments": {
+              "query": "Supplier A"
+            }
+          },
+          {
+            "kind": "tool_result",
+            "tool": "web_search",
+            "result": {
+              "summary": "Supplier A: reliable, 30 days delivery",
+              "results": [
+                {
+                  "title": "Supplier A: reliable, 30 days delivery",
+                  "url": "https://intranet.example/suppliers"
+                }
+              ]
+            },
+            "summary": "Supplier A: reliable, 30 days delivery"
+          },
+          {
+            "kind": "document_out",
+            "to": "done",
+            "documentId": "doc_4",
+            "content": "Supplier A: reliable, 30 days delivery"
+          },
+          {
+            "kind": "document_out",
+            "to": "board",
+            "documentId": "doc_5",
+            "content": "Supplier A: reliable, 30 days delivery"
+          }
+        ],
         "metrics": {
           "durationMs": 0,
           "model": "scripted-v1"
@@ -386,49 +587,66 @@
       }
     },
     {
-      "id": "evt_0015",
-      "runId": "run_tables",
-      "sequence": 15,
+      "id": "evt_0019",
+      "runId": "run_supplier_board",
+      "sequence": 19,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_STARTED",
       "actorId": "luca",
       "payload": {
-        "input": "",
+        "input": "Supplier B",
         "role": "Researcher",
+        "model": {
+          "provider": "fake",
+          "name": "scripted-v1"
+        },
         "documentIds": []
       }
     },
     {
-      "id": "evt_0016",
-      "runId": "run_tables",
-      "sequence": 16,
+      "id": "evt_0020",
+      "runId": "run_supplier_board",
+      "sequence": 20,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DOCUMENT_TAKEN",
       "actorId": "luca",
       "payload": {
         "tableId": "todo",
-        "documentId": "doc_2",
+        "documentId": "doc_3",
         "remaining": 0
       }
     },
     {
-      "id": "evt_0017",
-      "runId": "run_tables",
-      "sequence": 17,
+      "id": "evt_0021",
+      "runId": "run_supplier_board",
+      "sequence": 21,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "DECISION",
+      "actorId": "luca",
+      "payload": {
+        "kind": "tool_selection",
+        "summary": "Use web_search to handle the request.",
+        "tool": "web_search"
+      }
+    },
+    {
+      "id": "evt_0022",
+      "runId": "run_supplier_board",
+      "sequence": 22,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "TOOL_CALL",
       "actorId": "luca",
       "payload": {
         "tool": "web_search",
         "arguments": {
-          "query": "supplier B"
+          "query": "Supplier B"
         }
       }
     },
     {
-      "id": "evt_0018",
-      "runId": "run_tables",
-      "sequence": 18,
+      "id": "evt_0023",
+      "runId": "run_supplier_board",
+      "sequence": 23,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "TOOL_RESULT",
       "actorId": "luca",
@@ -436,7 +654,12 @@
         "tool": "web_search",
         "result": {
           "summary": "Supplier B: cheaper, 60 days delivery",
-          "results": []
+          "results": [
+            {
+              "title": "Supplier B: cheaper, 60 days delivery",
+              "url": "https://intranet.example/suppliers"
+            }
+          ]
         },
         "summary": "Supplier B: cheaper, 60 days delivery",
         "metrics": {
@@ -445,57 +668,95 @@
       }
     },
     {
-      "id": "evt_0019",
-      "runId": "run_tables",
-      "sequence": 19,
+      "id": "evt_0024",
+      "runId": "run_supplier_board",
+      "sequence": 24,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "DOCUMENT_WRITTEN",
+      "actorId": "luca",
+      "payload": {
+        "tableId": "done",
+        "documentId": "doc_6",
+        "version": 1,
+        "title": "Supplier B: cheaper, 60 days delivery",
+        "content": "Supplier B: cheaper, 60 days delivery"
+      }
+    },
+    {
+      "id": "evt_0025",
+      "runId": "run_supplier_board",
+      "sequence": 25,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DOCUMENT_WRITTEN",
       "actorId": "luca",
       "payload": {
         "tableId": "board",
-        "documentId": "doc_3",
-        "version": 3,
-        "title": "Status",
-        "content": "2 of 2 suppliers researched.\nA: reliable, 30 days delivery.\nB: cheaper, 60 days delivery."
+        "documentId": "doc_5",
+        "version": 2,
+        "title": "Board",
+        "content": "Supplier B: cheaper, 60 days delivery"
       }
     },
     {
-      "id": "evt_0020",
-      "runId": "run_tables",
-      "sequence": 20,
-      "timestamp": "2026-10-05T14:31:02.000Z",
-      "type": "DECISION",
-      "actorId": "luca",
-      "payload": {
-        "kind": "handoff",
-        "summary": "The pile is empty. Hand off to Gianni.",
-        "target": "gianni"
-      }
-    },
-    {
-      "id": "evt_0021",
-      "runId": "run_tables",
-      "sequence": 21,
-      "timestamp": "2026-10-05T14:31:02.000Z",
-      "type": "MESSAGE_SENT",
-      "actorId": "luca",
-      "targetId": "gianni",
-      "payload": {
-        "content": "Both suppliers are on the board. Please send the summary.",
-        "documentId": "doc_4",
-        "version": 1,
-        "title": "Message to Gianni"
-      }
-    },
-    {
-      "id": "evt_0022",
-      "runId": "run_tables",
-      "sequence": 22,
+      "id": "evt_0026",
+      "runId": "run_supplier_board",
+      "sequence": 26,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_FINISHED",
       "actorId": "luca",
       "payload": {
-        "output": "Both suppliers are on the board. Please send the summary.",
+        "output": "Supplier B: cheaper, 60 days delivery",
+        "context": [
+          {
+            "kind": "system",
+            "content": "Research the supplier on the sheet you take."
+          },
+          {
+            "kind": "document",
+            "from": "todo",
+            "documentId": "doc_3",
+            "version": 1,
+            "title": "Supplier B",
+            "content": "Supplier B"
+          },
+          {
+            "kind": "decision",
+            "content": "Use web_search to handle the request."
+          },
+          {
+            "kind": "tool_call",
+            "tool": "web_search",
+            "arguments": {
+              "query": "Supplier B"
+            }
+          },
+          {
+            "kind": "tool_result",
+            "tool": "web_search",
+            "result": {
+              "summary": "Supplier B: cheaper, 60 days delivery",
+              "results": [
+                {
+                  "title": "Supplier B: cheaper, 60 days delivery",
+                  "url": "https://intranet.example/suppliers"
+                }
+              ]
+            },
+            "summary": "Supplier B: cheaper, 60 days delivery"
+          },
+          {
+            "kind": "document_out",
+            "to": "done",
+            "documentId": "doc_6",
+            "content": "Supplier B: cheaper, 60 days delivery"
+          },
+          {
+            "kind": "document_out",
+            "to": "board",
+            "documentId": "doc_5",
+            "content": "Supplier B: cheaper, 60 days delivery"
+          }
+        ],
         "metrics": {
           "durationMs": 0,
           "model": "scripted-v1"
@@ -503,53 +764,189 @@
       }
     },
     {
-      "id": "evt_0023",
-      "runId": "run_tables",
-      "sequence": 23,
+      "id": "evt_0027",
+      "runId": "run_supplier_board",
+      "sequence": 27,
       "timestamp": "2026-10-05T14:31:02.000Z",
-      "type": "MESSAGE_RECEIVED",
-      "actorId": "gianni",
-      "targetId": "luca",
+      "type": "AGENT_STARTED",
+      "actorId": "stapler",
       "payload": {
-        "content": "Both suppliers are on the board. Please send the summary.",
+        "input": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery",
+        "role": "Gathers what is done",
+        "model": {
+          "provider": "rule",
+          "name": "collector"
+        },
+        "documentIds": []
+      }
+    },
+    {
+      "id": "evt_0028",
+      "runId": "run_supplier_board",
+      "sequence": 28,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "DOCUMENT_TAKEN",
+      "actorId": "stapler",
+      "payload": {
+        "tableId": "done",
         "documentId": "doc_4",
+        "remaining": 1
+      }
+    },
+    {
+      "id": "evt_0029",
+      "runId": "run_supplier_board",
+      "sequence": 29,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "DOCUMENT_TAKEN",
+      "actorId": "stapler",
+      "payload": {
+        "tableId": "done",
+        "documentId": "doc_6",
+        "remaining": 0
+      }
+    },
+    {
+      "id": "evt_0030",
+      "runId": "run_supplier_board",
+      "sequence": 30,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "DECISION",
+      "actorId": "stapler",
+      "payload": {
+        "kind": "handoff",
+        "summary": "Hand off to Gianni.",
+        "target": "gianni",
+        "relationId": "r9"
+      }
+    },
+    {
+      "id": "evt_0031",
+      "runId": "run_supplier_board",
+      "sequence": 31,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "MESSAGE_SENT",
+      "actorId": "stapler",
+      "targetId": "gianni",
+      "payload": {
+        "content": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery",
+        "documentId": "doc_7",
         "version": 1,
         "title": "Message to Gianni"
       }
     },
     {
-      "id": "evt_0024",
-      "runId": "run_tables",
-      "sequence": 24,
+      "id": "evt_0032",
+      "runId": "run_supplier_board",
+      "sequence": 32,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "AGENT_FINISHED",
+      "actorId": "stapler",
+      "payload": {
+        "output": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery",
+        "context": [
+          {
+            "kind": "system",
+            "content": ""
+          },
+          {
+            "kind": "document",
+            "from": "done",
+            "documentId": "doc_4",
+            "version": 1,
+            "title": "Supplier A: reliable, 30 days delivery",
+            "content": "Supplier A: reliable, 30 days delivery"
+          },
+          {
+            "kind": "document",
+            "from": "done",
+            "documentId": "doc_6",
+            "version": 1,
+            "title": "Supplier B: cheaper, 60 days delivery",
+            "content": "Supplier B: cheaper, 60 days delivery"
+          },
+          {
+            "kind": "decision",
+            "content": "Hand off to Gianni."
+          },
+          {
+            "kind": "message_out",
+            "to": "gianni",
+            "content": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery",
+            "documentId": "doc_7"
+          }
+        ],
+        "metrics": {
+          "durationMs": 0,
+          "model": "collector"
+        }
+      }
+    },
+    {
+      "id": "evt_0033",
+      "runId": "run_supplier_board",
+      "sequence": 33,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "MESSAGE_RECEIVED",
+      "actorId": "gianni",
+      "targetId": "stapler",
+      "payload": {
+        "content": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery",
+        "documentId": "doc_7",
+        "version": 1,
+        "title": "Message to Gianni"
+      }
+    },
+    {
+      "id": "evt_0034",
+      "runId": "run_supplier_board",
+      "sequence": 34,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_STARTED",
       "actorId": "gianni",
       "payload": {
-        "input": "Both suppliers are on the board. Please send the summary.",
+        "input": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery",
         "role": "Communication",
+        "model": {
+          "provider": "fake",
+          "name": "scripted-v1"
+        },
         "documentIds": [
-          "doc_4"
+          "doc_7"
         ]
       }
     },
     {
-      "id": "evt_0025",
-      "runId": "run_tables",
-      "sequence": 25,
+      "id": "evt_0035",
+      "runId": "run_supplier_board",
+      "sequence": 35,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "DOCUMENT_READ",
       "actorId": "gianni",
       "payload": {
         "tableId": "board",
         "documentIds": [
-          "doc_3"
+          "doc_5"
         ]
       }
     },
     {
-      "id": "evt_0026",
-      "runId": "run_tables",
-      "sequence": 26,
+      "id": "evt_0036",
+      "runId": "run_supplier_board",
+      "sequence": 36,
+      "timestamp": "2026-10-05T14:31:02.000Z",
+      "type": "DECISION",
+      "actorId": "gianni",
+      "payload": {
+        "kind": "tool_selection",
+        "summary": "Use send_email to handle the request.",
+        "tool": "send_email"
+      }
+    },
+    {
+      "id": "evt_0037",
+      "runId": "run_supplier_board",
+      "sequence": 37,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "TOOL_CALL",
       "actorId": "gianni",
@@ -557,15 +954,15 @@
         "tool": "send_email",
         "arguments": {
           "to": "management@example.com",
-          "subject": "Suppliers",
-          "body": "A: reliable, 30 days delivery.\nB: cheaper, 60 days delivery."
+          "subject": "Update from Pixel Agents",
+          "body": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery"
         }
       }
     },
     {
-      "id": "evt_0027",
-      "runId": "run_tables",
-      "sequence": 27,
+      "id": "evt_0038",
+      "runId": "run_supplier_board",
+      "sequence": 38,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "TOOL_RESULT",
       "actorId": "gianni",
@@ -573,7 +970,9 @@
         "tool": "send_email",
         "result": {
           "summary": "Email sent to management@example.com",
-          "status": "sent"
+          "status": "sent",
+          "to": "management@example.com",
+          "subject": "Update from Pixel Agents"
         },
         "summary": "Email sent to management@example.com",
         "metrics": {
@@ -582,14 +981,68 @@
       }
     },
     {
-      "id": "evt_0028",
-      "runId": "run_tables",
-      "sequence": 28,
+      "id": "evt_0039",
+      "runId": "run_supplier_board",
+      "sequence": 39,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "AGENT_FINISHED",
       "actorId": "gianni",
       "payload": {
         "output": "Email sent to management@example.com",
+        "context": [
+          {
+            "kind": "system",
+            "content": "Deliver results to the right people."
+          },
+          {
+            "kind": "message",
+            "from": "stapler",
+            "content": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery",
+            "documentId": "doc_7"
+          },
+          {
+            "kind": "table",
+            "tableId": "board",
+            "documents": [
+              {
+                "kind": "document",
+                "from": "board",
+                "documentId": "doc_5",
+                "version": 2,
+                "title": "Board",
+                "content": "Supplier B: cheaper, 60 days delivery"
+              }
+            ]
+          },
+          {
+            "kind": "decision",
+            "content": "Use send_email to handle the request."
+          },
+          {
+            "kind": "tool_call",
+            "tool": "send_email",
+            "arguments": {
+              "to": "management@example.com",
+              "subject": "Update from Pixel Agents",
+              "body": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery"
+            }
+          },
+          {
+            "kind": "tool_result",
+            "tool": "send_email",
+            "result": {
+              "summary": "Email sent to management@example.com",
+              "status": "sent",
+              "to": "management@example.com",
+              "subject": "Update from Pixel Agents"
+            },
+            "summary": "Email sent to management@example.com"
+          },
+          {
+            "kind": "output",
+            "content": "Email sent to management@example.com"
+          }
+        ],
         "metrics": {
           "durationMs": 0,
           "model": "scripted-v1"
@@ -597,14 +1050,14 @@
       }
     },
     {
-      "id": "evt_0029",
-      "runId": "run_tables",
-      "sequence": 29,
+      "id": "evt_0040",
+      "runId": "run_supplier_board",
+      "sequence": 40,
       "timestamp": "2026-10-05T14:31:02.000Z",
       "type": "RUN_FINISHED",
       "payload": {
         "output": "Email sent to management@example.com",
-        "documentId": "doc_5",
+        "documentId": "doc_8",
         "version": 1,
         "title": "Result",
         "authorId": "gianni"
@@ -619,7 +1072,7 @@
           {
             "version": 1,
             "title": "Task",
-            "content": "Research two suppliers and keep the board up to date.",
+            "content": "Research our two suppliers and send management what you find.",
             "createdSequence": 1
           }
         ],
@@ -638,7 +1091,7 @@
             "agentId": "anna"
           },
           {
-            "sequence": 7,
+            "sequence": 5,
             "action": "filed",
             "agentId": "anna"
           }
@@ -649,34 +1102,34 @@
         "versions": [
           {
             "version": 1,
-            "title": "Supplier A",
-            "content": "Research supplier A.",
+            "title": "Message to Sorter",
+            "content": "Supplier A\nSupplier B",
             "authorId": "anna",
             "createdSequence": 4
           }
         ],
         "place": {
           "kind": "filed",
-          "agentId": "luca"
+          "agentId": "sorter"
         },
         "history": [
           {
             "sequence": 4,
-            "action": "written",
+            "action": "handed",
             "agentId": "anna",
-            "tableId": "todo",
+            "peerId": "sorter",
             "version": 1
           },
           {
-            "sequence": 9,
-            "action": "taken",
-            "agentId": "luca",
-            "tableId": "todo"
+            "sequence": 6,
+            "action": "received",
+            "agentId": "sorter",
+            "peerId": "anna"
           },
           {
-            "sequence": 14,
+            "sequence": 10,
             "action": "filed",
-            "agentId": "luca"
+            "agentId": "sorter"
           }
         ]
       },
@@ -685,10 +1138,10 @@
         "versions": [
           {
             "version": 1,
-            "title": "Supplier B",
-            "content": "Research supplier B.",
-            "authorId": "anna",
-            "createdSequence": 5
+            "title": "Supplier A",
+            "content": "Supplier A",
+            "authorId": "sorter",
+            "createdSequence": 8
           }
         ],
         "place": {
@@ -697,20 +1150,20 @@
         },
         "history": [
           {
-            "sequence": 5,
+            "sequence": 8,
             "action": "written",
-            "agentId": "anna",
+            "agentId": "sorter",
             "tableId": "todo",
             "version": 1
           },
           {
-            "sequence": 16,
+            "sequence": 12,
             "action": "taken",
             "agentId": "luca",
             "tableId": "todo"
           },
           {
-            "sequence": 22,
+            "sequence": 18,
             "action": "filed",
             "agentId": "luca"
           }
@@ -721,63 +1174,34 @@
         "versions": [
           {
             "version": 1,
-            "title": "Status",
-            "content": "0 of 2 suppliers researched.",
-            "authorId": "anna",
-            "createdSequence": 6
-          },
-          {
-            "version": 2,
-            "title": "Status",
-            "content": "1 of 2 suppliers researched.\nA: reliable, 30 days delivery.",
-            "authorId": "luca",
-            "createdSequence": 13
-          },
-          {
-            "version": 3,
-            "title": "Status",
-            "content": "2 of 2 suppliers researched.\nA: reliable, 30 days delivery.\nB: cheaper, 60 days delivery.",
-            "authorId": "luca",
-            "createdSequence": 19
+            "title": "Supplier B",
+            "content": "Supplier B",
+            "authorId": "sorter",
+            "createdSequence": 9
           }
         ],
         "place": {
-          "kind": "table",
-          "tableId": "board"
+          "kind": "filed",
+          "agentId": "luca"
         },
         "history": [
           {
-            "sequence": 6,
+            "sequence": 9,
             "action": "written",
-            "agentId": "anna",
-            "tableId": "board",
+            "agentId": "sorter",
+            "tableId": "todo",
             "version": 1
           },
           {
-            "sequence": 10,
-            "action": "read",
+            "sequence": 20,
+            "action": "taken",
             "agentId": "luca",
-            "tableId": "board"
+            "tableId": "todo"
           },
           {
-            "sequence": 13,
-            "action": "written",
-            "agentId": "luca",
-            "tableId": "board",
-            "version": 2
-          },
-          {
-            "sequence": 19,
-            "action": "written",
-            "agentId": "luca",
-            "tableId": "board",
-            "version": 3
-          },
-          {
-            "sequence": 25,
-            "action": "read",
-            "agentId": "gianni",
-            "tableId": "board"
+            "sequence": 26,
+            "action": "filed",
+            "agentId": "luca"
           }
         ]
       },
@@ -786,34 +1210,34 @@
         "versions": [
           {
             "version": 1,
-            "title": "Message to Gianni",
-            "content": "Both suppliers are on the board. Please send the summary.",
+            "title": "Supplier A: reliable, 30 days delivery",
+            "content": "Supplier A: reliable, 30 days delivery",
             "authorId": "luca",
-            "createdSequence": 21
+            "createdSequence": 16
           }
         ],
         "place": {
           "kind": "filed",
-          "agentId": "gianni"
+          "agentId": "stapler"
         },
         "history": [
           {
-            "sequence": 21,
-            "action": "handed",
+            "sequence": 16,
+            "action": "written",
             "agentId": "luca",
-            "peerId": "gianni",
+            "tableId": "done",
             "version": 1
           },
           {
-            "sequence": 23,
-            "action": "received",
-            "agentId": "gianni",
-            "peerId": "luca"
+            "sequence": 28,
+            "action": "taken",
+            "agentId": "stapler",
+            "tableId": "done"
           },
           {
-            "sequence": 28,
+            "sequence": 32,
             "action": "filed",
-            "agentId": "gianni"
+            "agentId": "stapler"
           }
         ]
       },
@@ -822,10 +1246,127 @@
         "versions": [
           {
             "version": 1,
+            "title": "Board",
+            "content": "Supplier A: reliable, 30 days delivery",
+            "authorId": "luca",
+            "createdSequence": 17
+          },
+          {
+            "version": 2,
+            "title": "Board",
+            "content": "Supplier B: cheaper, 60 days delivery",
+            "authorId": "luca",
+            "createdSequence": 25
+          }
+        ],
+        "place": {
+          "kind": "table",
+          "tableId": "board"
+        },
+        "history": [
+          {
+            "sequence": 17,
+            "action": "written",
+            "agentId": "luca",
+            "tableId": "board",
+            "version": 1
+          },
+          {
+            "sequence": 25,
+            "action": "written",
+            "agentId": "luca",
+            "tableId": "board",
+            "version": 2
+          },
+          {
+            "sequence": 35,
+            "action": "read",
+            "agentId": "gianni",
+            "tableId": "board"
+          }
+        ]
+      },
+      "doc_6": {
+        "id": "doc_6",
+        "versions": [
+          {
+            "version": 1,
+            "title": "Supplier B: cheaper, 60 days delivery",
+            "content": "Supplier B: cheaper, 60 days delivery",
+            "authorId": "luca",
+            "createdSequence": 24
+          }
+        ],
+        "place": {
+          "kind": "filed",
+          "agentId": "stapler"
+        },
+        "history": [
+          {
+            "sequence": 24,
+            "action": "written",
+            "agentId": "luca",
+            "tableId": "done",
+            "version": 1
+          },
+          {
+            "sequence": 29,
+            "action": "taken",
+            "agentId": "stapler",
+            "tableId": "done"
+          },
+          {
+            "sequence": 32,
+            "action": "filed",
+            "agentId": "stapler"
+          }
+        ]
+      },
+      "doc_7": {
+        "id": "doc_7",
+        "versions": [
+          {
+            "version": 1,
+            "title": "Message to Gianni",
+            "content": "Supplier A: reliable, 30 days delivery\nSupplier B: cheaper, 60 days delivery",
+            "authorId": "stapler",
+            "createdSequence": 31
+          }
+        ],
+        "place": {
+          "kind": "filed",
+          "agentId": "gianni"
+        },
+        "history": [
+          {
+            "sequence": 31,
+            "action": "handed",
+            "agentId": "stapler",
+            "peerId": "gianni",
+            "version": 1
+          },
+          {
+            "sequence": 33,
+            "action": "received",
+            "agentId": "gianni",
+            "peerId": "stapler"
+          },
+          {
+            "sequence": 39,
+            "action": "filed",
+            "agentId": "gianni"
+          }
+        ]
+      },
+      "doc_8": {
+        "id": "doc_8",
+        "versions": [
+          {
+            "version": 1,
             "title": "Result",
             "content": "Email sent to management@example.com",
             "authorId": "gianni",
-            "createdSequence": 29
+            "createdSequence": 40
           }
         ],
         "place": {
@@ -834,7 +1375,7 @@
         },
         "history": [
           {
-            "sequence": 29,
+            "sequence": 40,
             "action": "delivered",
             "agentId": "gianni"
           }
@@ -847,12 +1388,16 @@
       "doc_2",
       "doc_3",
       "doc_4",
-      "doc_5"
+      "doc_5",
+      "doc_6",
+      "doc_7",
+      "doc_8"
     ],
     "tables": {
       "todo": [],
+      "done": [],
       "board": [
-        "doc_3"
+        "doc_5"
       ]
     }
   },
@@ -881,76 +1426,8 @@
         "agentId": "anna"
       },
       "doc_1": {
-        "kind": "table",
-        "tableId": "todo"
-      }
-    },
-    {
-      "doc_input": {
         "kind": "hand",
-        "agentId": "anna"
-      },
-      "doc_1": {
-        "kind": "table",
-        "tableId": "todo"
-      },
-      "doc_2": {
-        "kind": "table",
-        "tableId": "todo"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "hand",
-        "agentId": "anna"
-      },
-      "doc_1": {
-        "kind": "table",
-        "tableId": "todo"
-      },
-      "doc_2": {
-        "kind": "table",
-        "tableId": "todo"
-      },
-      "doc_3": {
-        "kind": "table",
-        "tableId": "board"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "filed",
-        "agentId": "anna"
-      },
-      "doc_1": {
-        "kind": "table",
-        "tableId": "todo"
-      },
-      "doc_2": {
-        "kind": "table",
-        "tableId": "todo"
-      },
-      "doc_3": {
-        "kind": "table",
-        "tableId": "board"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "filed",
-        "agentId": "anna"
-      },
-      "doc_1": {
-        "kind": "table",
-        "tableId": "todo"
-      },
-      "doc_2": {
-        "kind": "table",
-        "tableId": "todo"
-      },
-      "doc_3": {
-        "kind": "table",
-        "tableId": "board"
+        "agentId": "sorter"
       }
     },
     {
@@ -960,7 +1437,51 @@
       },
       "doc_1": {
         "kind": "hand",
-        "agentId": "luca"
+        "agentId": "sorter"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "hand",
+        "agentId": "sorter"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "hand",
+        "agentId": "sorter"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "hand",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "table",
+        "tableId": "todo"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "hand",
+        "agentId": "sorter"
       },
       "doc_2": {
         "kind": "table",
@@ -968,7 +1489,7 @@
       },
       "doc_3": {
         "kind": "table",
-        "tableId": "board"
+        "tableId": "todo"
       }
     },
     {
@@ -977,8 +1498,8 @@
         "agentId": "anna"
       },
       "doc_1": {
-        "kind": "hand",
-        "agentId": "luca"
+        "kind": "filed",
+        "agentId": "sorter"
       },
       "doc_2": {
         "kind": "table",
@@ -986,7 +1507,7 @@
       },
       "doc_3": {
         "kind": "table",
-        "tableId": "board"
+        "tableId": "todo"
       }
     },
     {
@@ -995,8 +1516,8 @@
         "agentId": "anna"
       },
       "doc_1": {
-        "kind": "hand",
-        "agentId": "luca"
+        "kind": "filed",
+        "agentId": "sorter"
       },
       "doc_2": {
         "kind": "table",
@@ -1004,7 +1525,7 @@
       },
       "doc_3": {
         "kind": "table",
-        "tableId": "board"
+        "tableId": "todo"
       }
     },
     {
@@ -1013,16 +1534,16 @@
         "agentId": "anna"
       },
       "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
         "kind": "hand",
         "agentId": "luca"
       },
-      "doc_2": {
+      "doc_3": {
         "kind": "table",
         "tableId": "todo"
-      },
-      "doc_3": {
-        "kind": "table",
-        "tableId": "board"
       }
     },
     {
@@ -1031,16 +1552,16 @@
         "agentId": "anna"
       },
       "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
         "kind": "hand",
         "agentId": "luca"
       },
-      "doc_2": {
+      "doc_3": {
         "kind": "table",
         "tableId": "todo"
-      },
-      "doc_3": {
-        "kind": "table",
-        "tableId": "board"
       }
     },
     {
@@ -1050,15 +1571,15 @@
       },
       "doc_1": {
         "kind": "filed",
-        "agentId": "luca"
+        "agentId": "sorter"
       },
       "doc_2": {
+        "kind": "hand",
+        "agentId": "luca"
+      },
+      "doc_3": {
         "kind": "table",
         "tableId": "todo"
-      },
-      "doc_3": {
-        "kind": "table",
-        "tableId": "board"
       }
     },
     {
@@ -1068,15 +1589,15 @@
       },
       "doc_1": {
         "kind": "filed",
-        "agentId": "luca"
+        "agentId": "sorter"
       },
       "doc_2": {
+        "kind": "hand",
+        "agentId": "luca"
+      },
+      "doc_3": {
         "kind": "table",
         "tableId": "todo"
-      },
-      "doc_3": {
-        "kind": "table",
-        "tableId": "board"
       }
     },
     {
@@ -1086,7 +1607,7 @@
       },
       "doc_1": {
         "kind": "filed",
-        "agentId": "luca"
+        "agentId": "sorter"
       },
       "doc_2": {
         "kind": "hand",
@@ -1094,279 +1615,745 @@
       },
       "doc_3": {
         "kind": "table",
-        "tableId": "board"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "filed",
-        "agentId": "anna"
-      },
-      "doc_1": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_2": {
-        "kind": "hand",
-        "agentId": "luca"
-      },
-      "doc_3": {
-        "kind": "table",
-        "tableId": "board"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "filed",
-        "agentId": "anna"
-      },
-      "doc_1": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_2": {
-        "kind": "hand",
-        "agentId": "luca"
-      },
-      "doc_3": {
-        "kind": "table",
-        "tableId": "board"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "filed",
-        "agentId": "anna"
-      },
-      "doc_1": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_2": {
-        "kind": "hand",
-        "agentId": "luca"
-      },
-      "doc_3": {
-        "kind": "table",
-        "tableId": "board"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "filed",
-        "agentId": "anna"
-      },
-      "doc_1": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_2": {
-        "kind": "hand",
-        "agentId": "luca"
-      },
-      "doc_3": {
-        "kind": "table",
-        "tableId": "board"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "filed",
-        "agentId": "anna"
-      },
-      "doc_1": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_2": {
-        "kind": "hand",
-        "agentId": "luca"
-      },
-      "doc_3": {
-        "kind": "table",
-        "tableId": "board"
+        "tableId": "todo"
       },
       "doc_4": {
+        "kind": "table",
+        "tableId": "done"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
         "kind": "hand",
-        "agentId": "gianni"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "filed",
-        "agentId": "anna"
-      },
-      "doc_1": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_2": {
-        "kind": "filed",
         "agentId": "luca"
       },
       "doc_3": {
         "kind": "table",
-        "tableId": "board"
+        "tableId": "todo"
       },
       "doc_4": {
-        "kind": "hand",
-        "agentId": "gianni"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "filed",
-        "agentId": "anna"
-      },
-      "doc_1": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_2": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_3": {
         "kind": "table",
-        "tableId": "board"
-      },
-      "doc_4": {
-        "kind": "hand",
-        "agentId": "gianni"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "filed",
-        "agentId": "anna"
-      },
-      "doc_1": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_2": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_3": {
-        "kind": "table",
-        "tableId": "board"
-      },
-      "doc_4": {
-        "kind": "hand",
-        "agentId": "gianni"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "filed",
-        "agentId": "anna"
-      },
-      "doc_1": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_2": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_3": {
-        "kind": "table",
-        "tableId": "board"
-      },
-      "doc_4": {
-        "kind": "hand",
-        "agentId": "gianni"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "filed",
-        "agentId": "anna"
-      },
-      "doc_1": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_2": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_3": {
-        "kind": "table",
-        "tableId": "board"
-      },
-      "doc_4": {
-        "kind": "hand",
-        "agentId": "gianni"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "filed",
-        "agentId": "anna"
-      },
-      "doc_1": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_2": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_3": {
-        "kind": "table",
-        "tableId": "board"
-      },
-      "doc_4": {
-        "kind": "hand",
-        "agentId": "gianni"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "filed",
-        "agentId": "anna"
-      },
-      "doc_1": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_2": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_3": {
-        "kind": "table",
-        "tableId": "board"
-      },
-      "doc_4": {
-        "kind": "filed",
-        "agentId": "gianni"
-      }
-    },
-    {
-      "doc_input": {
-        "kind": "filed",
-        "agentId": "anna"
-      },
-      "doc_1": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_2": {
-        "kind": "filed",
-        "agentId": "luca"
-      },
-      "doc_3": {
-        "kind": "table",
-        "tableId": "board"
-      },
-      "doc_4": {
-        "kind": "filed",
-        "agentId": "gianni"
+        "tableId": "done"
       },
       "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "table",
+        "tableId": "todo"
+      },
+      "doc_4": {
+        "kind": "table",
+        "tableId": "done"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "table",
+        "tableId": "todo"
+      },
+      "doc_4": {
+        "kind": "table",
+        "tableId": "done"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "hand",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "table",
+        "tableId": "done"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "hand",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "table",
+        "tableId": "done"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "hand",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "table",
+        "tableId": "done"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "hand",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "table",
+        "tableId": "done"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "hand",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "table",
+        "tableId": "done"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      },
+      "doc_6": {
+        "kind": "table",
+        "tableId": "done"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "hand",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "table",
+        "tableId": "done"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      },
+      "doc_6": {
+        "kind": "table",
+        "tableId": "done"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "table",
+        "tableId": "done"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      },
+      "doc_6": {
+        "kind": "table",
+        "tableId": "done"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "table",
+        "tableId": "done"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      },
+      "doc_6": {
+        "kind": "table",
+        "tableId": "done"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "hand",
+        "agentId": "stapler"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      },
+      "doc_6": {
+        "kind": "table",
+        "tableId": "done"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "hand",
+        "agentId": "stapler"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      },
+      "doc_6": {
+        "kind": "hand",
+        "agentId": "stapler"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "hand",
+        "agentId": "stapler"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      },
+      "doc_6": {
+        "kind": "hand",
+        "agentId": "stapler"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "hand",
+        "agentId": "stapler"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      },
+      "doc_6": {
+        "kind": "hand",
+        "agentId": "stapler"
+      },
+      "doc_7": {
+        "kind": "hand",
+        "agentId": "gianni"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "filed",
+        "agentId": "stapler"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      },
+      "doc_6": {
+        "kind": "filed",
+        "agentId": "stapler"
+      },
+      "doc_7": {
+        "kind": "hand",
+        "agentId": "gianni"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "filed",
+        "agentId": "stapler"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      },
+      "doc_6": {
+        "kind": "filed",
+        "agentId": "stapler"
+      },
+      "doc_7": {
+        "kind": "hand",
+        "agentId": "gianni"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "filed",
+        "agentId": "stapler"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      },
+      "doc_6": {
+        "kind": "filed",
+        "agentId": "stapler"
+      },
+      "doc_7": {
+        "kind": "hand",
+        "agentId": "gianni"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "filed",
+        "agentId": "stapler"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      },
+      "doc_6": {
+        "kind": "filed",
+        "agentId": "stapler"
+      },
+      "doc_7": {
+        "kind": "hand",
+        "agentId": "gianni"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "filed",
+        "agentId": "stapler"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      },
+      "doc_6": {
+        "kind": "filed",
+        "agentId": "stapler"
+      },
+      "doc_7": {
+        "kind": "hand",
+        "agentId": "gianni"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "filed",
+        "agentId": "stapler"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      },
+      "doc_6": {
+        "kind": "filed",
+        "agentId": "stapler"
+      },
+      "doc_7": {
+        "kind": "hand",
+        "agentId": "gianni"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "filed",
+        "agentId": "stapler"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      },
+      "doc_6": {
+        "kind": "filed",
+        "agentId": "stapler"
+      },
+      "doc_7": {
+        "kind": "hand",
+        "agentId": "gianni"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "filed",
+        "agentId": "stapler"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      },
+      "doc_6": {
+        "kind": "filed",
+        "agentId": "stapler"
+      },
+      "doc_7": {
+        "kind": "filed",
+        "agentId": "gianni"
+      }
+    },
+    {
+      "doc_input": {
+        "kind": "filed",
+        "agentId": "anna"
+      },
+      "doc_1": {
+        "kind": "filed",
+        "agentId": "sorter"
+      },
+      "doc_2": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_3": {
+        "kind": "filed",
+        "agentId": "luca"
+      },
+      "doc_4": {
+        "kind": "filed",
+        "agentId": "stapler"
+      },
+      "doc_5": {
+        "kind": "table",
+        "tableId": "board"
+      },
+      "doc_6": {
+        "kind": "filed",
+        "agentId": "stapler"
+      },
+      "doc_7": {
+        "kind": "filed",
+        "agentId": "gianni"
+      },
+      "doc_8": {
         "kind": "tray",
         "tray": "out"
       }

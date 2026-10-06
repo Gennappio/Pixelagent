@@ -93,31 +93,31 @@ describe("mapEventToActions", () => {
 
   describe("tables", () => {
     it("turns DOCUMENT_WRITTEN into: write the sheet, walk to the table, put it down, walk back", () => {
-      expect(mapEventToActions(eventOfType("DOCUMENT_WRITTEN", "anna", tablesEvents))).toEqual([
-        { type: "SHOW_DOCUMENT", documentId: "doc_1", title: "Supplier A", version: 1, at: { kind: "hand", agentId: "anna" } },
-        { type: "MOVE_TO", agentId: "anna", target: { kind: "table", id: "todo" } },
-        { type: "PLACE_DOCUMENT", documentId: "doc_1", to: { kind: "table", tableId: "todo" } },
-        { type: "RETURN_TO_POSITION", agentId: "anna" },
+      expect(mapEventToActions(eventOfType("DOCUMENT_WRITTEN", "sorter", tablesEvents))).toEqual([
+        { type: "SHOW_DOCUMENT", documentId: "doc_2", title: "Supplier A", version: 1, at: { kind: "hand", agentId: "sorter" } },
+        { type: "MOVE_TO", agentId: "sorter", target: { kind: "table", id: "todo" } },
+        { type: "PLACE_DOCUMENT", documentId: "doc_2", to: { kind: "table", tableId: "todo" } },
+        { type: "RETURN_TO_POSITION", agentId: "sorter" },
       ]);
     });
 
     it("shows the new version number when a shared sheet is rewritten", () => {
       const rewrite = tablesEvents.find((event) => event.type === "DOCUMENT_WRITTEN" && event.payload.version === 2)!;
-      expect(mapEventToActions(rewrite)[0]).toMatchObject({ type: "SHOW_DOCUMENT", documentId: "doc_3", version: 2 });
+      expect(mapEventToActions(rewrite)[0]).toMatchObject({ type: "SHOW_DOCUMENT", documentId: "doc_5", title: "Board", version: 2 });
     });
 
     it("turns DOCUMENT_TAKEN into a walk to the table and a sheet in hand", () => {
       expect(mapEventToActions(eventOfType("DOCUMENT_TAKEN", "luca", tablesEvents))).toEqual([
         { type: "MOVE_TO", agentId: "luca", target: { kind: "table", id: "todo" } },
-        { type: "TAKE_DOCUMENT", documentId: "doc_1", to: { kind: "hand", agentId: "luca" } },
+        { type: "TAKE_DOCUMENT", documentId: "doc_2", to: { kind: "hand", agentId: "luca" } },
         { type: "RETURN_TO_POSITION", agentId: "luca" },
       ]);
     });
 
     it("turns DOCUMENT_READ into a visit that leaves the sheets where they are", () => {
-      const actions = mapEventToActions(eventOfType("DOCUMENT_READ", "luca", tablesEvents));
+      const actions = mapEventToActions(eventOfType("DOCUMENT_READ", "gianni", tablesEvents));
       expect(types(actions)).toEqual(["MOVE_TO", "SET_STATUS", "WAIT", "RETURN_TO_POSITION"]);
-      expect(actions[0]).toEqual({ type: "MOVE_TO", agentId: "luca", target: { kind: "table", id: "board" } });
+      expect(actions[0]).toEqual({ type: "MOVE_TO", agentId: "gianni", target: { kind: "table", id: "board" } });
     });
   });
 

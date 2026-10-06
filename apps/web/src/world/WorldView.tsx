@@ -17,6 +17,7 @@ export function WorldView({ insets }: { insets: Insets }) {
       onBubbleClick: (eventId) => select({ kind: "event", eventId }),
       onStationClick: (tool) => select({ kind: "tool", tool }),
       onDocumentClick: (documentId) => select({ kind: "document", documentId }),
+      onTableClick: (tableId) => select({ kind: "table", tableId }),
       onFloorClick: () => select(null),
     });
     world.current = instance;
@@ -36,6 +37,7 @@ export function WorldView({ insets }: { insets: Insets }) {
       agentId: selection?.kind === "agent" ? selection.agentId : undefined,
       tool: selection?.kind === "tool" ? selection.tool : undefined,
       documentId: selection?.kind === "document" ? selection.documentId : undefined,
+      tableId: selection?.kind === "table" ? selection.tableId : undefined,
     });
   }, [selection]);
 

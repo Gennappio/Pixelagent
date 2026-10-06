@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { api } from "../api/client";
-import { deriveAgentTools, emptyWorkflow } from "../graph/workflowEdits";
+import { emptyWorkflow } from "../build/workflowEdits";
+import { upgradeWorkflow } from "../protocol/migrate";
 import type { ToolDescription, Workflow, WorkflowSummary } from "../protocol/workflow";
 
 interface WorkflowState {
@@ -16,8 +17,9 @@ interface WorkflowState {
   /** Persists the workflow and returns the saved version (with its server id). */
   save: () => Promise<Workflow>;
   createNew: () => void;
-  importWorkflow: (workflow: Workflow) => void;
-  /** Applies a pure edit from graph/workflowEdits. */
+  /** Takes a workflow read from a file, of this revision or an older one, as an unsaved draft. */
+  importWorkflow: (workflow: Record<string, unknown>) => void;
+  /** Applies a pure edit from build/workflowEdits. */
   edit: (change: (workflow: Workflow) => Workflow) => void;
 }
 
@@ -64,7 +66,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
   createNew: () => set({ workflow: emptyWorkflow(), dirty: true }),
 
-  importWorkflow: (workflow) => set({ workflow: deriveAgentTools({ ...workflow, id: "" }), dirty: true }),
+  importWorkflow: (workflow) => set({ workflow: { ...upgradeWorkflow(workflow), id: "" }, dirty: true }),
 
   edit: (change) => {
     const before = get().workflow;

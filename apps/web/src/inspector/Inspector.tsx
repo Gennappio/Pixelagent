@@ -6,6 +6,7 @@ import { useWorkflowStore } from "../state/workflowStore";
 import { AgentInspector } from "./AgentInspector";
 import { DocumentInspector } from "./DocumentInspector";
 import { EventInspector } from "./EventInspector";
+import { TableInspector } from "./TableInspector";
 
 function ToolInspector({ tool }: { tool: string }) {
   const description = useWorkflowStore((state) => state.tools.find((candidate) => candidate.name === tool));
@@ -49,11 +50,17 @@ export function Inspector({ names }: { names: Record<string, string> }) {
 
   if (selection?.kind === "agent") {
     // With a run on screen the inspector describes the agent that ran, not the one being edited.
-    const agent = (run?.workflow ?? workflow).agents.find((candidate) => candidate.id === selection.agentId);
+    const shown = run?.workflow ?? workflow;
+    const agent = shown.agents.find((candidate) => candidate.id === selection.agentId);
     if (agent) {
       // Keyed so switching agents (or loading a run) resets the open tab.
-      return <AgentInspector key={`${agent.id}:${run?.id ?? "build"}`} agent={agent} editable={!run} names={names} />;
+      return <AgentInspector key={`${agent.id}:${run?.id ?? "build"}`} workflow={shown} agent={agent} editable={!run} names={names} />;
     }
+  }
+  if (selection?.kind === "table") {
+    const shown = run?.workflow ?? workflow;
+    const table = shown.tables.find((candidate) => candidate.id === selection.tableId);
+    if (table) return <TableInspector workflow={shown} table={table} editable={!run} />;
   }
   if (selection?.kind === "event") {
     const event = replay.log.find((candidate) => candidate.id === selection.eventId);
@@ -65,7 +72,7 @@ export function Inspector({ names }: { names: Record<string, string> }) {
 
   return (
     <div className="inspector empty">
-      <p>Click a character, a sheet, a tool, a speech bubble or a timeline event to inspect it.</p>
+      <p>Click a character, a sheet, a table, a tool, a speech bubble or a timeline event to inspect it.</p>
     </div>
   );
 }

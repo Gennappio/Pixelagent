@@ -97,14 +97,27 @@ describe("the settled world does not depend on lanes", () => {
 
 describe("events on different lanes animate together", () => {
   const trace = play(parallelEvents, parallelLayout, LOOKAHEAD);
-  const lucaCall = indexOf(parallelEvents, 13);
-  const gianniCall = indexOf(parallelEvents, 14);
+  const lucaCall = indexOf(parallelEvents, 14);
+  const gianniCall = indexOf(parallelEvents, 15);
 
-  it("has Luca and Gianni walk to their tools at the same time", () => {
+  it("has Luca and Gianni at their tools at the same time", () => {
+    // Not in lockstep: Anna briefs Luca first, so he is a little ahead. But their tool calls
+    // overlap, and for a good while both are away from their desks, each at a busy station.
     const together = trace.frames.filter((frame) => frame.active.includes(lucaCall) && frame.active.includes(gianniCall));
     expect(together.length).toBeGreaterThan(10);
-    expect(together.some((frame) => frame.state.agents.luca.animation === "walk" && frame.state.agents.gianni.animation === "walk")).toBe(true);
-    expect(together.some((frame) => frame.state.stations.web_search.active && frame.state.stations.send_email.active)).toBe(true);
+    const bothBusy = trace.frames.filter((frame) => frame.state.stations.web_search.active && frame.state.stations.send_email.active);
+    expect(bothBusy.length).toBeGreaterThan(30);
+    for (const frame of bothBusy) {
+      expect(frame.state.stations.web_search.userId).toBe("luca");
+      expect(frame.state.stations.send_email.userId).toBe("gianni");
+      expect(frame.state.agents.luca.position).not.toEqual(parallelLayout.homes.luca);
+      expect(frame.state.agents.gianni.position).not.toEqual(parallelLayout.homes.gianni);
+    }
+    // Shown one event at a time, the two calls are never animated together. (Both stations
+    // still end up busy at once: Gianni's call comes before Luca's result in the log itself.)
+    const oneByOne = play(parallelEvents, parallelLayout, 1).frames;
+    expect(oneByOne.some((frame) => frame.active.includes(lucaCall) && frame.active.includes(gianniCall))).toBe(false);
+    expect(oneByOne.some((frame) => frame.state.stations.web_search.active && frame.state.stations.send_email.active)).toBe(true);
   });
 
   it("takes less time than showing the same events one by one", () => {
@@ -135,11 +148,12 @@ describe("events on different lanes animate together", () => {
     expect(moment.state.agents.anna.animation).toBe("walk");
   });
 
-  it("makes the second reporter wait until Anna has taken the first report", () => {
-    const first = indexOf(parallelEvents, 19); // Luca → Anna
-    const second = indexOf(parallelEvents, 20); // Gianni → Anna
+  it("makes the second reporter wait until Marta has taken the first report", () => {
+    const first = indexOf(parallelEvents, 20); // Luca → Marta
+    const second = indexOf(parallelEvents, 22); // Gianni → Marta
+    expect([parallelEvents[first].targetId, parallelEvents[second].targetId]).toEqual(["marta", "marta"]);
     const moment = trace.frames[trace.start[second]];
-    expect(moment.state.documents.doc_3.place).toEqual({ kind: "hand", agentId: "anna" });
+    expect(moment.state.documents.doc_3.place).toEqual({ kind: "hand", agentId: "marta" });
     expect(moment.state.documents.doc_3.transit).toBeUndefined();
     expect(trace.start[second]).toBeGreaterThan(trace.start[first]);
     // ...and nobody talks over anybody.
@@ -158,16 +172,16 @@ describe("events on different lanes animate together", () => {
   });
 
   it("does not show the run finishing while someone it does not involve is still moving", () => {
-    // Luca is on his way to a tool when the log says the run is over, with Anna's result.
+    // Luca is on his way to a tool when the log says the run is over, with Marta's result.
     // Nothing ties the two together but the run itself, which is the point.
-    const log = [parallelEvents[0], parallelEvents[indexOf(parallelEvents, 13)], parallelEvents.at(-1)!].map((event, index) => ({
+    const log = [parallelEvents[0], parallelEvents[indexOf(parallelEvents, 14)], parallelEvents.at(-1)!].map((event, index) => ({
       ...event,
       sequence: index + 1,
     }));
     expect(log.map((event) => [event.type, event.actorId ?? event.payload.authorId])).toEqual([
       ["RUN_STARTED", undefined],
       ["TOOL_CALL", "luca"],
-      ["RUN_FINISHED", "anna"],
+      ["RUN_FINISHED", "marta"],
     ]);
     const { frames, start, end } = play(log, parallelLayout, LOOKAHEAD);
     expect(start[2]).toBeGreaterThanOrEqual(end[1]);
@@ -215,17 +229,18 @@ describe("stepping and live logs", () => {
   it("launch(1) starts only the event at the playhead", () => {
     const scheduler = new AnimationScheduler();
     scheduler.load(parallelEvents, parallelLayout);
-    scheduler.jumpTo(indexOf(parallelEvents, 13));
+    // The playhead on Luca's tool call, with Gianni's right behind it.
+    scheduler.jumpTo(indexOf(parallelEvents, 14));
     scheduler.launch(1);
-    expect(scheduler.active).toEqual([indexOf(parallelEvents, 13)]);
+    expect(scheduler.active).toEqual([indexOf(parallelEvents, 14)]);
     scheduler.launch(LOOKAHEAD);
-    expect(scheduler.active).toEqual([indexOf(parallelEvents, 13), indexOf(parallelEvents, 14)]);
+    expect(scheduler.active).toEqual([indexOf(parallelEvents, 14), indexOf(parallelEvents, 15)]);
   });
 
   it("settleFront finishes the event at the playhead and takes back what ran ahead", () => {
     const scheduler = new AnimationScheduler();
     scheduler.load(parallelEvents, parallelLayout);
-    scheduler.jumpTo(indexOf(parallelEvents, 13));
+    scheduler.jumpTo(indexOf(parallelEvents, 14));
     for (let i = 0; i < 20; i++) scheduler.advance(16, LOOKAHEAD);
     expect(scheduler.active.length).toBeGreaterThan(1);
     const playhead = scheduler.settled;

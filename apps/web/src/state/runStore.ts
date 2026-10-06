@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { api, openRunStream } from "../api/client";
 import type { AgentEvent } from "../protocol/events";
+import { upgradeWorkflow } from "../protocol/migrate";
 import type { Run, RunSummary, Workflow } from "../protocol/workflow";
 import { buildLayout } from "../world/layout";
 import { replay } from "./replayStore";
@@ -22,6 +23,8 @@ interface RunState {
   open: (runId: string) => Promise<void>;
   /** Replays a run from a saved export file; no server involved. */
   openExport: (data: { run: Run; events: AgentEvent[] }) => void;
+  /** Asks the server to stop the live run on screen. Its log then ends with an event saying so. */
+  stop: () => Promise<void>;
   close: () => void;
 }
 
@@ -102,7 +105,18 @@ export const useRunStore = create<RunState>((set, get) => {
       }
     },
 
-    openExport: ({ run, events }) => show(run, events),
+    // A file may have been exported long ago: its workflow is read in today's schema.
+    openExport: ({ run, events }) => show({ ...run, workflow: upgradeWorkflow(run.workflow as unknown as Record<string, unknown>) }, events),
+
+    stop: async () => {
+      const { run, mode } = get();
+      if (!run || mode !== "run") return;
+      try {
+        await api.stopRun(run.id);
+      } catch (error) {
+        set({ error: message(error) });
+      }
+    },
 
     close: () => {
       stopStream();

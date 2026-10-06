@@ -117,25 +117,26 @@ describe("a sheet changing hands", () => {
 
 describe("sheets on tables", () => {
   it("stacks a pile and spreads a shared table", () => {
-    const state = worldStateAt(tablesEvents, 6, officeLayout); // two on the pile, one on the board
-    const spot = (id: string) => sheetPosition(state, officeLayout, state.documents[id])!;
+    const piled = worldStateAt(tablesEvents, 9, officeLayout); // the splitter has put two sheets on the pile
+    const spot = (state: typeof piled, id: string) => sheetPosition(state, officeLayout, state.documents[id])!;
     const pile = officeLayout.tablePositions.todo;
-    expect(spot("doc_1").x).toBe(pile.x);
-    expect(spot("doc_2").x).toBe(pile.x);
-    expect(spot("doc_2").y).toBeLessThan(spot("doc_1").y); // the second lies on top of the first
-    expect(Math.abs(spot("doc_3").x - officeLayout.tablePositions.board.x)).toBeLessThan(30);
+    expect(spot(piled, "doc_2").x).toBe(pile.x);
+    expect(spot(piled, "doc_3").x).toBe(pile.x);
+    expect(spot(piled, "doc_3").y).toBeLessThan(spot(piled, "doc_2").y); // the second lies on top of the first
+    const written = worldStateAt(tablesEvents, 17, officeLayout); // Luca's first note is on the board
+    expect(Math.abs(spot(written, "doc_5").x - officeLayout.tablePositions.board.x)).toBeLessThan(30);
   });
 
   it("keeps a shared sheet in its spot when a new version is put down", () => {
     const spotAfter = (count: number) => {
       const state = worldStateAt(tablesEvents, count, officeLayout);
-      return [state.documents.doc_3.version, sheetPosition(state, officeLayout, state.documents.doc_3)];
+      return [state.documents.doc_5.version, sheetPosition(state, officeLayout, state.documents.doc_5)];
     };
-    expect(spotAfter(6)[0]).toBe(1);
-    expect(spotAfter(13)[0]).toBe(2);
-    expect(spotAfter(19)[0]).toBe(3);
-    expect(spotAfter(13)[1]).toEqual(spotAfter(6)[1]);
-    expect(spotAfter(19)[1]).toEqual(spotAfter(6)[1]);
+    expect(spotAfter(17)[0]).toBe(1);
+    expect(spotAfter(25)[0]).toBe(2);
+    expect(spotAfter(40)[0]).toBe(2);
+    expect(spotAfter(25)[1]).toEqual(spotAfter(17)[1]);
+    expect(spotAfter(40)[1]).toEqual(spotAfter(17)[1]);
   });
 
   it("stands the agent beside the table, facing it", () => {

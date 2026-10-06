@@ -1,4 +1,4 @@
-import { backToBuild, replayLatest, runWorkflow } from "../state/actions";
+import { backToBuild, replayLatest, runWorkflow, stopRun } from "../state/actions";
 import { useRunStore } from "../state/runStore";
 import { useUiStore } from "../state/uiStore";
 import { useWorkflowStore } from "../state/workflowStore";
@@ -75,9 +75,16 @@ export function TopBar() {
       <button className={help ? "active" : ""} aria-pressed={help} title="Keyboard shortcuts (?)" onClick={() => setHelp(!help)}>
         ?
       </button>
-      <button className="primary run" disabled={mode === "run"} title="Run the workflow (Ctrl Enter)" onClick={() => void runWorkflow()}>
-        ▶ RUN
-      </button>
+      {mode === "run" ? (
+        // The run is the server's: stopping it ends it there, with an event that says so.
+        <button className="danger run" title="Stop this run" onClick={() => void stopRun()}>
+          ■ STOP
+        </button>
+      ) : (
+        <button className="primary run" title="Run the workflow (Ctrl Enter)" onClick={() => void runWorkflow()}>
+          ▶ RUN
+        </button>
+      )}
     </header>
   );
 }

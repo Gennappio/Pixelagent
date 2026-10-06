@@ -16,8 +16,17 @@ class MockSearchTool(Tool):
         "required": ["query"],
     }
 
+    # What the mock index knows, by a word the query must contain.
+    SUPPLIERS = {
+        "supplier a": "Supplier A: reliable, 30 days delivery",
+        "supplier b": "Supplier B: cheaper, 60 days delivery",
+    }
+
     async def execute(self, args: dict[str, Any]) -> Any:
         query = str(args.get("query", ""))
+        for name, finding in self.SUPPLIERS.items():
+            if name in query.lower():
+                return {"summary": finding, "results": [{"title": finding, "url": "https://intranet.example/suppliers"}]}
         if "sales" in query.lower():
             return {
                 "summary": "Sales: €1.2M",

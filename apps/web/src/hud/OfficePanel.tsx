@@ -1,16 +1,16 @@
 import { useMemo, useRef } from "react";
 import { api } from "../api/client";
+import { addAgent, addTable } from "../build/workflowEdits";
 import { formatTime } from "../debugger/transcript";
-import { addAgent, addToolNode } from "../graph/workflowEdits";
 import { describePlace } from "../inspector/documentView";
 import { foldDocuments, latestVersion } from "../protocol/documents";
+import { toolsInUse, whyNotRunnable } from "../protocol/relations";
 import { namesOf, toolLabel } from "../protocol/workflow";
 import { backToBuild } from "../state/actions";
 import { replay, useReplay } from "../state/replayStore";
 import { useRunStore } from "../state/runStore";
 import { useUiStore } from "../state/uiStore";
 import { useWorkflowStore } from "../state/workflowStore";
-import { buildLayout } from "../world/layout";
 import { cssColor, spriteFor } from "../world/sprites";
 import { Section } from "./Panel";
 
@@ -48,21 +48,21 @@ function useJsonFile(onLoad: (data: any) => void) {
 }
 
 /**
- * What is in the office: the workflow file, its agents and tools, and the stored runs.
- * Everything that changes the workflow is offered in build mode only.
+ * What is in the office: the workflow file, its agents, tools and tables, and the stored
+ * runs. Everything that changes the workflow is offered in build mode only.
  */
 export function OfficePanel() {
   const { workflow, workflows, tools, dirty, edit, open, save, createNew, importWorkflow } = useWorkflowStore();
   const { runs, run, open: openRun, openExport } = useRunStore();
   const selection = useUiStore((state) => state.selection);
   const select = useUiStore((state) => state.select);
-  const setPanel = useUiStore((state) => state.setPanel);
 
   const building = run === null;
   /** With a run on screen the lists describe what was executed, not what is being edited. */
   const shown = run?.workflow ?? workflow;
-  const placed = useMemo(() => buildLayout(shown).tools, [shown]);
+  const inUse = useMemo(() => toolsInUse(shown), [shown]);
   const names = useMemo(() => namesOf(shown), [shown]);
+  const missing = useMemo(() => whyNotRunnable(workflow), [workflow]);
   // Every sheet of the run as of the playhead, filed ones included: those are out of
   // sight in the world, and this list is how to get back to them.
   const { position, total } = useReplay();
@@ -72,7 +72,8 @@ export function OfficePanel() {
   }, [position, total]);
 
   const workflowFile = useJsonFile((data) => {
-    if (!Array.isArray(data?.agents) || !Array.isArray(data?.nodes)) return alert("That file is not a workflow.");
+    // A workflow of today has relations; one from before them had a graph, and is read all the same.
+    if (!Array.isArray(data?.agents) || !(Array.isArray(data?.relations) || Array.isArray(data?.nodes))) return alert("That file is not a workflow.");
     backToBuild();
     importWorkflow(data);
   });
@@ -131,10 +132,15 @@ export function OfficePanel() {
               <textarea
                 rows={3}
                 value={workflow.input}
-                placeholder="What the first agent is asked to do"
+                placeholder="What the entry agent is asked to do"
                 onChange={(event) => edit((current) => ({ ...current, input: event.target.value }))}
               />
             </label>
+            {missing.map((reason) => (
+              <p key={reason} className="notice">
+                {reason}
+              </p>
+            ))}
           </>
         ) : (
           <>
@@ -181,16 +187,12 @@ export function OfficePanel() {
           ))}
           {shown.agents.length === 0 && <li className="muted">No agents yet.</li>}
         </ul>
-        {building && (
-          <button className="hint" title="Open the graph (G)" onClick={() => setPanel("graph", true)}>
-            Connect agents in the graph <kbd>G</kbd>
-          </button>
-        )}
+        {building && shown.agents.length > 0 && <p className="muted">Select an agent to say what it does.</p>}
       </Section>
 
       <Section id="office.tools" title="Tools">
         <ul className="list">
-          {(building ? tools.map((tool) => tool.name) : placed).map((name) => (
+          {(building ? tools.map((tool) => tool.name) : inUse).map((name) => (
             <li
               key={name}
               className={`row clickable${selection?.kind === "tool" && selection.tool === name ? " selected" : ""}`}
@@ -198,25 +200,60 @@ export function OfficePanel() {
               onClick={() => select({ kind: "tool", tool: name })}
             >
               {toolLabel(name)}
-              {building &&
-                (placed.includes(name) ? (
-                  <span className="tag">in office</span>
-                ) : (
-                  <button
-                    title="Place a station for this tool in the office"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      edit((current) => addToolNode(current, name).workflow);
-                    }}
-                  >
-                    +
-                  </button>
-                ))}
+              {building && inUse.includes(name) && <span className="tag">in office</span>}
             </li>
           ))}
-          {!building && placed.length === 0 && <li className="muted">This run used no tools.</li>}
+          {!building && inUse.length === 0 && <li className="muted">This run used no tools.</li>}
         </ul>
+        {building && <p className="muted">A tool gets a station when an agent can use it.</p>}
       </Section>
+
+      {(building || shown.tables.length > 0) && (
+        <Section
+          id="office.tables"
+          title="Tables"
+          actions={
+            building && (
+              <>
+                <button
+                  title="Add a shared table: sheets on it are read and rewritten"
+                  onClick={() => {
+                    const added = addTable(workflow, "shared");
+                    edit(() => added.workflow);
+                    select({ kind: "table", tableId: added.table.id });
+                  }}
+                >
+                  + table
+                </button>
+                <button
+                  title="Add a pile: sheets on it are taken one at a time"
+                  onClick={() => {
+                    const added = addTable(workflow, "pile");
+                    edit(() => added.workflow);
+                    select({ kind: "table", tableId: added.table.id });
+                  }}
+                >
+                  + pile
+                </button>
+              </>
+            )
+          }
+        >
+          <ul className="list">
+            {shown.tables.map((table) => (
+              <li
+                key={table.id}
+                className={`row clickable${selection?.kind === "table" && selection.tableId === table.id ? " selected" : ""}`}
+                onClick={() => select({ kind: "table", tableId: table.id })}
+              >
+                {table.name || table.id}
+                <span className="tag">{table.mode === "pile" ? "pile" : "shared"}</span>
+              </li>
+            ))}
+            {shown.tables.length === 0 && <li className="muted">No tables: sheets only pass from hand to hand.</li>}
+          </ul>
+        </Section>
+      )}
 
       {!building && (
         <Section id="office.sheets" title="Sheets">

@@ -3,7 +3,7 @@ import { agentRuntimeView } from "../inspector/runtimeView";
 import { demoEvents, eventOfType, tablesEvents } from "../testing/demoRun";
 import { buildTranscript, describeEvent } from "./transcript";
 
-const names = { anna: "Anna", luca: "Luca", gianni: "Gianni", board: "Board", todo: "To research" };
+const names = { anna: "Anna", luca: "Luca", gianni: "Gianni", sorter: "Sorter", stapler: "Stapler", board: "Board", todo: "To research", done: "Researched" };
 
 describe("buildTranscript", () => {
   it("describes the demo run in plain sentences", () => {
@@ -39,21 +39,23 @@ describe("buildTranscript", () => {
 
   it("has a sentence for everything that happens at a table", () => {
     const sentence = (sequence: number) => describeEvent(tablesEvents[sequence - 1], names);
-    expect(sentence(4)).toBe("Anna put “Supplier A” on the table “To research”.");
-    expect(sentence(9)).toBe("Luca took a sheet from the table “To research”, 1 left.");
-    expect(sentence(10)).toBe("Luca read the sheet on the table “Board”.");
-    expect(sentence(13)).toBe("Luca put version 2 of “Status” on the table “Board”.");
-    expect(sentence(16)).toBe("Luca took a sheet from the table “To research”, 0 left.");
+    expect(sentence(8)).toBe("Sorter put “Supplier A” on the table “To research”.");
+    expect(sentence(12)).toBe("Luca took a sheet from the table “To research”, 1 left.");
+    expect(sentence(17)).toBe("Luca put “Board” on the table “Board”.");
+    expect(sentence(20)).toBe("Luca took a sheet from the table “To research”, 0 left.");
+    expect(sentence(25)).toBe("Luca put version 2 of “Board” on the table “Board”.");
+    expect(sentence(29)).toBe("Stapler took a sheet from the table “Researched”, 0 left.");
+    expect(sentence(35)).toBe("Gianni read the sheet on the table “Board”.");
   });
 
   it("counts the sheets when more than one is read", () => {
-    const read = eventOfType("DOCUMENT_READ", "luca", tablesEvents);
+    const read = eventOfType("DOCUMENT_READ", "gianni", tablesEvents);
     const several = { ...read, payload: { ...read.payload, documentIds: ["doc_1", "doc_2", "doc_3"] } };
-    expect(describeEvent(several, names)).toBe("Luca read 3 sheets on the table “Board”.");
+    expect(describeEvent(several, names)).toBe("Gianni read 3 sheets on the table “Board”.");
   });
 
   it("falls back to the id of a table or an agent it has no name for", () => {
-    expect(describeEvent(tablesEvents[3], {})).toBe("anna put “Supplier A” on the table “todo”.");
+    expect(describeEvent(tablesEvents[7], {})).toBe("sorter put “Supplier A” on the table “todo”.");
   });
 
   it("keeps the old wording for logs written before messages were sheets", () => {

@@ -17,6 +17,11 @@ from server.events.models import CamelModel
 INPUT_DOCUMENT_ID = "doc_input"
 
 
+def sheet(document_id: str, title: str, version: int = 1) -> dict[str, Any]:
+    """The fields that identify a document inside an event payload."""
+    return {"documentId": document_id, "version": version, "title": title}
+
+
 class DocumentVersion(CamelModel):
     version: int
     title: str = ""

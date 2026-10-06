@@ -1,18 +1,38 @@
 // Workflow schema shared with the server (apps/server/server/workflow/models.py).
+//
+// A workflow is an office: agents, tables, and a list of relations, sentences of the
+// form subject, verb, object, that say what each agent does. There is no graph to draw
+// by hand; the graph view is derived from the relations.
 
-export interface ModelConfiguration {
-  provider: string;
-  name: string;
-  /** Fake provider only: outgoing message template with {input} / {result}. */
-  script?: { message?: string };
+export const SCHEMA_VERSION = 2;
+export const DEFAULT_ROOM_ID = "office";
+
+/** One rule of a router: hand the sheet to `to` when its text contains `contains`. */
+export interface RouterRule {
+  contains: string;
+  to: string;
 }
 
-export interface ToolReference {
+export interface ModelConfiguration {
+  /** fake: scripted, no API key. rule: follows a rule instead of asking a model. */
+  provider: string;
+  /** The model, or for a rule which one: router, splitter, collector. */
   name: string;
+  /** Fake provider: `message` is what it says, with {input} / {result}. `title` names the sheets it writes. */
+  script?: { message?: string; title?: string };
+  /** Router rule. */
+  rules?: RouterRule[];
+  otherwise?: string;
 }
 
 export interface AgentAppearance {
   sprite: string;
+}
+
+/** A group of agents, stations and tables that works alongside the other rooms. */
+export interface Room {
+  id: string;
+  name: string;
 }
 
 export interface Agent {
@@ -20,31 +40,16 @@ export interface Agent {
   id: string;
   name: string;
   role: string;
+  roomId: string;
+  instances: number;
   model: ModelConfiguration;
   systemPrompt: string;
-  tools: ToolReference[];
   appearance: AgentAppearance;
 }
-
-export type NodeType = "start" | "agent" | "tool" | "end";
 
 export interface Position {
   x: number;
   y: number;
-}
-
-export interface WorkflowNode {
-  id: string;
-  type: NodeType;
-  agentId?: string;
-  tool?: string;
-  position: Position;
-}
-
-export interface WorkflowEdge {
-  id: string;
-  source: string;
-  target: string;
 }
 
 /** Where documents are left for random access instead of being handed over. */
@@ -54,18 +59,57 @@ export interface WorkflowTable {
   /** shared: one versioned document per title. pile: a queue, taken one at a time. */
   mode: "shared" | "pile";
   scope: "room" | "global";
+  roomId: string;
+}
+
+/** What an agent can do. The catalog is closed: see protocol/relations.ts. */
+export type Verb =
+  | "sends_to"
+  | "waits_for"
+  | "uses_tool"
+  | "reads_table"
+  | "writes_table"
+  | "takes_from_table"
+  | "is_entry"
+  | "is_exit";
+
+/** One sentence about an agent. On the wire it says only what is not the default. */
+export interface Relation {
+  id: string;
+  /** An agent id. */
+  subject: string;
+  verb: Verb;
+  /** An agent id, a tool name or a table id, depending on the verb. Absent for is_entry / is_exit. */
+  object?: string;
+  /** Absent means true. False, for sends_to and writes_table, leaves it to the agent turn by turn. */
+  required?: boolean;
+  order?: number;
+  /** How many times the relation may fire in one run. Absent: 5 on a cycle, unlimited otherwise. */
+  maxRounds?: number;
+  /** Shown to the model: when this relation should be chosen. */
+  hint?: string;
+}
+
+/** Limits that end a run with RUN_ERROR instead of letting it go on forever. */
+export interface Budgets {
+  maxEvents: number;
+  maxTurnsPerAgent: number;
+  maxToolCallsPerTurn: number;
 }
 
 export interface Workflow {
   id: string;
+  schemaVersion: number;
   name: string;
-  /** Default task handed to the first agent. */
+  /** Default task handed to the entry agent. */
   input: string;
+  rooms: Room[];
   agents: Agent[];
-  /** Absent in workflows saved before tables existed. */
-  tables?: WorkflowTable[];
-  nodes: WorkflowNode[];
-  edges: WorkflowEdge[];
+  tables: WorkflowTable[];
+  relations: Relation[];
+  budgets: Budgets;
+  /** Where things stand in the world. Visual only: the runtime never reads it. */
+  layout: { positions: Record<string, Position> };
 }
 
 export interface WorkflowSummary {
@@ -74,7 +118,7 @@ export interface WorkflowSummary {
   updatedAt: string;
 }
 
-export type RunStatus = "running" | "finished" | "error" | "interrupted";
+export type RunStatus = "running" | "finished" | "error" | "stopped" | "interrupted";
 
 export interface RunSummary {
   id: string;
@@ -100,7 +144,7 @@ export interface ToolDescription {
 export function namesOf(workflow: Workflow): Record<string, string> {
   return Object.fromEntries([
     ...workflow.agents.map((agent) => [agent.id, agent.name]),
-    ...(workflow.tables ?? []).map((table) => [table.id, table.name || table.id]),
+    ...workflow.tables.map((table) => [table.id, table.name || table.id]),
   ]);
 }
 

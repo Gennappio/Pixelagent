@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 2,
+  "name": "Two desks",
+  "input": "Get the latest sales number, and warn management that it is coming.",
+  "rooms": [
+    {
+      "id": "office",
+      "name": "Office"
+    }
+  ],
+  "agents": [
+    {
+      "id": "anna",
+      "name": "Anna",
+      "role": "Manager",
+      "roomId": "office",
+      "instances": 1,
+      "model": {
+        "provider": "fake",
+        "name": "scripted-v1",
+        "script": {
+          "message": "The latest sales number is needed: find it, and warn management."
+        }
+      },
+      "systemPrompt": "Split the task between Luca and Gianni.",
+      "appearance": {
+        "sprite": "agent_female_01"
+      }
+    },
+    {
+      "id": "luca",
+      "name": "Luca",
+      "role": "Researcher",
+      "roomId": "office",
+      "instances": 1,
+      "model": {
+        "provider": "fake",
+        "name": "scripted-v1"
+      },
+      "systemPrompt": "Find what is asked for.",
+      "appearance": {
+        "sprite": "agent_male_01"
+      }
+    },
+    {
+      "id": "gianni",
+      "name": "Gianni",
+      "role": "Communication",
+      "roomId": "office",
+      "instances": 1,
+      "model": {
+        "provider": "fake",
+        "name": "scripted-v1"
+      },
+      "systemPrompt": "Tell the right people.",
+      "appearance": {
+        "sprite": "agent_male_02"
+      }
+    },
+    {
+      "id": "marta",
+      "name": "Marta",
+      "role": "Editor",
+      "roomId": "office",
+      "instances": 1,
+      "model": {
+        "provider": "fake",
+        "name": "scripted-v1",
+        "script": {
+          "message": "Done.\n{input}"
+        }
+      },
+      "systemPrompt": "Put together what the others bring.",
+      "appearance": {
+        "sprite": "agent_female_02"
+      }
+    }
+  ],
+  "tables": [],
+  "relations": [
+    {
+      "id": "r1",
+      "subject": "anna",
+      "verb": "is_entry"
+    },
+    {
+      "id": "r2",
+      "subject": "anna",
+      "verb": "sends_to",
+      "object": "luca"
+    },
+    {
+      "id": "r3",
+      "subject": "anna",
+      "verb": "sends_to",
+      "object": "gianni"
+    },
+    {
+      "id": "r4",
+      "subject": "luca",
+      "verb": "uses_tool",
+      "object": "web_search"
+    },
+    {
+      "id": "r5",
+      "subject": "luca",
+      "verb": "sends_to",
+      "object": "marta"
+    },
+    {
+      "id": "r6",
+      "subject": "gianni",
+      "verb": "uses_tool",
+      "object": "send_email"
+    },
+    {
+      "id": "r7",
+      "subject": "gianni",
+      "verb": "sends_to",
+      "object": "marta"
+    },
+    {
+      "id": "r8",
+      "subject": "marta",
+      "verb": "waits_for",
+      "object": "luca"
+    },
+    {
+      "id": "r9",
+      "subject": "marta",
+      "verb": "waits_for",
+      "object": "gianni"
+    },
+    {
+      "id": "r10",
+      "subject": "marta",
+      "verb": "is_exit"
+    }
+  ],
+  "budgets": {
+    "maxEvents": 5000,
+    "maxTurnsPerAgent": 100,
+    "maxToolCallsPerTurn": 10
+  },
+  "layout": {
+    "positions": {}
+  },
+  "id": "two_desks"
+}

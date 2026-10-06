@@ -1,11 +1,20 @@
 {
+  "schemaVersion": 2,
   "name": "Sales report demo",
   "input": "Find the latest sales number and send it to management.",
+  "rooms": [
+    {
+      "id": "office",
+      "name": "Office"
+    }
+  ],
   "agents": [
     {
       "id": "anna",
       "name": "Anna",
       "role": "Manager",
+      "roomId": "office",
+      "instances": 1,
       "model": {
         "provider": "fake",
         "name": "scripted-v1",
@@ -14,7 +23,6 @@
         }
       },
       "systemPrompt": "Coordinate the task and delegate work.",
-      "tools": [],
       "appearance": {
         "sprite": "agent_female_01"
       }
@@ -23,6 +31,8 @@
       "id": "luca",
       "name": "Luca",
       "role": "Researcher",
+      "roomId": "office",
+      "instances": 1,
       "model": {
         "provider": "fake",
         "name": "scripted-v1",
@@ -31,11 +41,6 @@
         }
       },
       "systemPrompt": "Research the request using the available tools and report the findings.",
-      "tools": [
-        {
-          "name": "web_search"
-        }
-      ],
       "appearance": {
         "sprite": "agent_male_01"
       }
@@ -44,115 +49,62 @@
       "id": "gianni",
       "name": "Gianni",
       "role": "Communication",
+      "roomId": "office",
+      "instances": 1,
       "model": {
         "provider": "fake",
         "name": "scripted-v1"
       },
       "systemPrompt": "Deliver results to the right people.",
-      "tools": [
-        {
-          "name": "send_email"
-        }
-      ],
       "appearance": {
         "sprite": "agent_male_02"
       }
     }
   ],
-  "nodes": [
+  "tables": [],
+  "relations": [
     {
-      "id": "start",
-      "type": "start",
-      "position": {
-        "x": 40.0,
-        "y": 40.0
-      }
+      "id": "r1",
+      "subject": "anna",
+      "verb": "is_entry"
     },
     {
-      "id": "node_anna",
-      "type": "agent",
-      "agentId": "anna",
-      "position": {
-        "x": 0.0,
-        "y": 140.0
-      }
+      "id": "r2",
+      "subject": "anna",
+      "verb": "sends_to",
+      "object": "luca"
     },
     {
-      "id": "node_luca",
-      "type": "agent",
-      "agentId": "luca",
-      "position": {
-        "x": 0.0,
-        "y": 280.0
-      }
+      "id": "r3",
+      "subject": "luca",
+      "verb": "uses_tool",
+      "object": "web_search"
     },
     {
-      "id": "node_search",
-      "type": "tool",
-      "tool": "web_search",
-      "position": {
-        "x": 280.0,
-        "y": 290.0
-      }
+      "id": "r4",
+      "subject": "luca",
+      "verb": "sends_to",
+      "object": "gianni"
     },
     {
-      "id": "node_gianni",
-      "type": "agent",
-      "agentId": "gianni",
-      "position": {
-        "x": 0.0,
-        "y": 420.0
-      }
+      "id": "r5",
+      "subject": "gianni",
+      "verb": "uses_tool",
+      "object": "send_email"
     },
     {
-      "id": "node_email",
-      "type": "tool",
-      "tool": "send_email",
-      "position": {
-        "x": 280.0,
-        "y": 430.0
-      }
-    },
-    {
-      "id": "end",
-      "type": "end",
-      "position": {
-        "x": 40.0,
-        "y": 560.0
-      }
+      "id": "r6",
+      "subject": "gianni",
+      "verb": "is_exit"
     }
   ],
-  "edges": [
-    {
-      "id": "e_start_anna",
-      "source": "start",
-      "target": "node_anna"
-    },
-    {
-      "id": "e_anna_luca",
-      "source": "node_anna",
-      "target": "node_luca"
-    },
-    {
-      "id": "e_luca_search",
-      "source": "node_luca",
-      "target": "node_search"
-    },
-    {
-      "id": "e_luca_gianni",
-      "source": "node_luca",
-      "target": "node_gianni"
-    },
-    {
-      "id": "e_gianni_email",
-      "source": "node_gianni",
-      "target": "node_email"
-    },
-    {
-      "id": "e_gianni_end",
-      "source": "node_gianni",
-      "target": "end"
-    }
-  ],
+  "budgets": {
+    "maxEvents": 5000,
+    "maxTurnsPerAgent": 100,
+    "maxToolCallsPerTurn": 10
+  },
+  "layout": {
+    "positions": {}
+  },
   "id": "demo"
 }

@@ -30,6 +30,41 @@ to Gianni, Gianni sends the email. Afterwards, replay it: pause, step event by e
 scrub, change speed, and click any character, speech bubble, timeline dot or log line
 to see the event behind it.
 
+Two more workflows are in the list, also with no API keys:
+
+- **Supplier board**: Anna names two suppliers, a splitter puts one sheet each on a pile,
+  Luca works through the pile and keeps a shared board up to date, a collector gathers
+  what is done and Gianni sends it.
+- **Two desks**: Anna hands out two jobs, Luca and Gianni do them at the same time, and
+  Marta waits for both before delivering.
+
+## Building a workflow
+
+A workflow is an office: agents, tables, and what each agent does, said one sentence at
+a time. Add agents and tables in the Office panel (`+`). Select an agent, and under
+*What it does* pick a verb and what it applies to:
+
+| Sentence | What happens |
+|---|---|
+| Anna **is the entry** | She receives the task of the run. |
+| Anna **hands a sheet to** Luca | When her turn ends, her output goes to Luca. |
+| Marta **waits for** Luca | She starts only with a sheet from everyone she waits for. |
+| Luca **can use** Web Search | The tool is available during his turn, and gets a station. |
+| Gianni **reads** Board | He reads what is on that shared table when his turn starts. |
+| Luca **writes on** Board | His output is left on the table: a new version each time. |
+| Luca **takes from** To research | He takes one sheet per turn from that pile. |
+| Gianni **is the exit** | His last output is the result of the run. |
+
+Handing over and writing can be left to the agent with *if it chooses*. There are no
+if, while or for blocks: an agent loops inside its own turn, a hand-off that leads back
+round repeats (five times unless you say otherwise), and work on many items is a pile.
+The graph (`G`) is drawn from these sentences and cannot be edited.
+
+Besides the scripted stand-in for an LLM, three agents follow a rule instead of asking a
+model: a **router** hands the sheet to whoever its rules name, a **splitter** writes one
+sheet per line on a pile, a **collector** waits for the office to go quiet and gathers a
+whole pile into one sheet.
+
 ## The screen
 
 The world fills the window. Everything else floats over it and collapses, and the
@@ -50,9 +85,8 @@ floor to pan, double-click to frame the room again.
 
 The switch in the top bar says what you are looking at. **BUILD**: no run on screen,
 the world previews the workflow, and this is the only mode that edits it. **RUN**: a
-live run. **REPLAY**: a stored run, shown as it was executed and read-only. Agents are
-still connected in the graph (`G`) for now; building inside the world comes with
-Phase 11.
+live run, which **■ STOP** ends. **REPLAY**: a stored run, shown as it was executed and
+read-only.
 
 ```bash
 npm test             # server (pytest) + web (vitest)
@@ -69,8 +103,8 @@ tests/fixtures run logs both test suites read, so server and web cannot drift ap
 apps/server/server/
   events/      AgentEvent protocol, EventEmitter (stamps id / sequence / timestamp)
   documents/   the sheets of a run, read back out of its event log
-  runtime/     AgentRuntime interface, SimpleRuntime, the deterministic FakeModel
-  workflow/    workflow schema, graph → execution plan, executor, demo workflow
+  runtime/     AgentRuntime interface, the office runtime, turn providers (fake, rule)
+  workflow/    workflow schema, relations, migration from revision 1, executor
   tools/       Tool interface and the mock tools (web_search, send_email, calculator)
   storage/     workflow files; SQLite for runs and the append-only event log
   websocket/   live event fan-out
@@ -82,7 +116,8 @@ apps/web/src/
   hud/         the shell: collapsible panels, top bar, shortcuts, graph overlay
   debugger/    ReplayController, timeline, playback bar, transcript
   inspector/   agent / event / tool inspectors
-  graph/       XYFlow workflow graph and pure workflow edits
+  build/       pure edits of a workflow: agents, tables, sentences
+  graph/       the workflow as a graph, derived from its relations (XYFlow, read-only)
   state/       stores, and the actions the bar, panels and shortcuts share
 ```
 
@@ -121,6 +156,7 @@ GET  /workflows            POST /workflows
 GET  /workflows/{id}       PUT  /workflows/{id}
 POST /workflows/{id}/run
 GET  /runs?workflow_id=    GET  /runs/{id}
+POST /runs/{id}/stop
 GET  /runs/{id}/events     GET  /runs/{id}/export
 WS   /runs/{id}/stream
 ```
@@ -128,24 +164,22 @@ WS   /runs/{id}/stream
 Server settings (environment): `PIXELAGENTS_WORKFLOWS` (workflow folder, default
 `workflows/`), `PIXELAGENTS_DB` (SQLite path for runs and events, default
 `apps/server/data/pixelagents.db`), `PIXELAGENTS_PACE` (seconds between runtime steps,
-default `0.3`; purely so live runs are watchable).
+default `0.3`; purely so live runs are watchable), `PIXELAGENTS_CONCURRENCY` (how many
+agents may work at the same time, default `4`).
 
 ## Status
 
-Phases 1–9 of AGENTS.md §38 are in place: event protocol, fake runtime, pixel world,
-event → animation, replay, graph editor, the world-first shell, documents, and
-animation lanes.
+Phases 1–10 of AGENTS.md §38 are in place: event protocol, pixel world, event →
+animation, replay, the world-first shell, documents, animation lanes, and workflows as
+relations run by the office runtime.
 
-AGENTS.md revision 2 (2026-10-05) sets the direction: the pixel world is the primary
+AGENTS.md revision 2 (2026-10-05) set the direction: the pixel world is the primary
 GUI and becomes the editor, the graph a derived read-only view, and the workflow a list
 of relations ("Anna sends_to Luca") over agents, tools, documents, tables and rooms.
-Next up is Phase 10 (relations and the office runtime); see AGENTS.md §38 for the plan.
-
-Two things are built into the protocol and the world before any runtime produces them,
-and can be seen by opening a file with Runs → Open file:
-
-- `tests/fixtures/tables_run.json`: tables, with a shared board and a pile of sheets;
-- `tests/fixtures/parallel_run.json`: two agents working at the same time.
-
-Until Phase 10 the runtime still executes a linear chain Start → agent → … → End;
-branching and loops are reported as a `RUN_ERROR`.
+Revision 3 (2026-10-06), after the first hands-on use, fixes what a character is (one
+task with three slots: what arrives, what it consults, where its sheet goes), splits a
+hand-off into a spoken message and a sheet, and moves building onto the characters
+themselves, with a game's interface and a camera that zooms. Next up is Phase 11 (the
+three slots and the spoken message, in the runtime and the protocol); see AGENTS.md §38
+for the plan. Workflows saved before relations existed, and runs exported then, still
+open: they are read as relations, and a file is rewritten only when saved.

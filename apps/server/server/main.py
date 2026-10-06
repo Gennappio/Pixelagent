@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 
 from server.events.models import TERMINAL_EVENT_TYPES
 from server.runtime.base import AgentRuntime
-from server.runtime.simple_runtime import SimpleRuntime
+from server.runtime.office_runtime import OfficeRuntime
 from server.storage.database import connect
 from server.storage.event_repository import EventRepository
 from server.storage.run_repository import RunRepository
@@ -43,7 +43,11 @@ def create_app(
     events = EventRepository(connection)
     streams = RunStreamManager()
     tools = default_registry()
-    runtime = runtime or SimpleRuntime(tools, pace=float(os.environ.get("PIXELAGENTS_PACE", "0.3")))
+    runtime = runtime or OfficeRuntime(
+        tools,
+        pace=float(os.environ.get("PIXELAGENTS_PACE", "0.3")),
+        concurrency=int(os.environ.get("PIXELAGENTS_CONCURRENCY", "4")),
+    )
     executor = WorkflowExecutor(runtime, runs, events, streams)
 
     runs.interrupt_running()
@@ -103,6 +107,12 @@ def create_app(
     @app.get("/runs/{run_id}", response_model_exclude_none=True)
     def get_run(run_id: str) -> Run:
         return require_run(run_id)
+
+    @app.post("/runs/{run_id}/stop")
+    def stop_run(run_id: str) -> dict[str, bool]:
+        """Ask a run to stop. `stopping` is false when it had already ended."""
+        require_run(run_id)
+        return {"stopping": executor.stop(run_id)}
 
     @app.get("/runs/{run_id}/events")
     def get_run_events(run_id: str, after: int = 0) -> list[dict[str, Any]]:

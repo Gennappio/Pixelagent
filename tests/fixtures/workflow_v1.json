@@ -1,0 +1,638 @@
+{
+  "cases": [
+    {
+      "name": "a graph with tools wired and listed",
+      "v1": {
+        "name": "Old",
+        "input": "task",
+        "agents": [
+          {
+            "id": "a",
+            "name": "A",
+            "tools": [
+              {
+                "name": "calculator"
+              }
+            ],
+            "appearance": {
+              "sprite": "agent_female_01"
+            }
+          },
+          {
+            "id": "b",
+            "name": "B",
+            "tools": []
+          }
+        ],
+        "nodes": [
+          {
+            "id": "start",
+            "type": "start"
+          },
+          {
+            "id": "na",
+            "type": "agent",
+            "agentId": "a"
+          },
+          {
+            "id": "nb",
+            "type": "agent",
+            "agentId": "b"
+          },
+          {
+            "id": "nt",
+            "type": "tool",
+            "tool": "web_search"
+          },
+          {
+            "id": "end",
+            "type": "end"
+          }
+        ],
+        "edges": [
+          {
+            "id": "e1",
+            "source": "start",
+            "target": "na"
+          },
+          {
+            "id": "e2",
+            "source": "na",
+            "target": "nb"
+          },
+          {
+            "id": "e3",
+            "source": "na",
+            "target": "nt"
+          },
+          {
+            "id": "e4",
+            "source": "nb",
+            "target": "nt"
+          },
+          {
+            "id": "e5",
+            "source": "nb",
+            "target": "end"
+          }
+        ]
+      },
+      "v2": {
+        "schemaVersion": 2,
+        "name": "Old",
+        "input": "task",
+        "rooms": [
+          {
+            "id": "office",
+            "name": "Office"
+          }
+        ],
+        "agents": [
+          {
+            "id": "a",
+            "name": "A",
+            "role": "",
+            "roomId": "office",
+            "instances": 1,
+            "model": {
+              "provider": "fake",
+              "name": "scripted-v1"
+            },
+            "systemPrompt": "",
+            "appearance": {
+              "sprite": "agent_female_01"
+            }
+          },
+          {
+            "id": "b",
+            "name": "B",
+            "role": "",
+            "roomId": "office",
+            "instances": 1,
+            "model": {
+              "provider": "fake",
+              "name": "scripted-v1"
+            },
+            "systemPrompt": "",
+            "appearance": {
+              "sprite": "agent_male_01"
+            }
+          }
+        ],
+        "tables": [],
+        "relations": [
+          {
+            "id": "r1",
+            "subject": "a",
+            "verb": "is_entry"
+          },
+          {
+            "id": "r2",
+            "subject": "a",
+            "verb": "uses_tool",
+            "object": "web_search"
+          },
+          {
+            "id": "r3",
+            "subject": "a",
+            "verb": "uses_tool",
+            "object": "calculator"
+          },
+          {
+            "id": "r4",
+            "subject": "a",
+            "verb": "sends_to",
+            "object": "b"
+          },
+          {
+            "id": "r5",
+            "subject": "b",
+            "verb": "uses_tool",
+            "object": "web_search"
+          },
+          {
+            "id": "r6",
+            "subject": "b",
+            "verb": "is_exit"
+          }
+        ],
+        "budgets": {
+          "maxEvents": 5000,
+          "maxTurnsPerAgent": 100,
+          "maxToolCallsPerTurn": 10
+        },
+        "layout": {
+          "positions": {}
+        }
+      }
+    },
+    {
+      "name": "the demo as it was",
+      "v1": {
+        "name": "Sales report demo",
+        "input": "Find the latest sales number and send it to management.",
+        "agents": [
+          {
+            "id": "anna",
+            "name": "Anna",
+            "role": "Manager",
+            "model": {
+              "provider": "fake",
+              "name": "scripted-v1",
+              "script": {
+                "message": "Find the latest sales number."
+              }
+            },
+            "systemPrompt": "Coordinate the task and delegate work.",
+            "tools": [],
+            "appearance": {
+              "sprite": "agent_female_01"
+            }
+          },
+          {
+            "id": "luca",
+            "name": "Luca",
+            "role": "Researcher",
+            "model": {
+              "provider": "fake",
+              "name": "scripted-v1",
+              "script": {
+                "message": "Send this result to management: {result}"
+              }
+            },
+            "systemPrompt": "Research the request using the available tools and report the findings.",
+            "tools": [
+              {
+                "name": "web_search"
+              }
+            ],
+            "appearance": {
+              "sprite": "agent_male_01"
+            }
+          },
+          {
+            "id": "gianni",
+            "name": "Gianni",
+            "role": "Communication",
+            "model": {
+              "provider": "fake",
+              "name": "scripted-v1"
+            },
+            "systemPrompt": "Deliver results to the right people.",
+            "tools": [
+              {
+                "name": "send_email"
+              }
+            ],
+            "appearance": {
+              "sprite": "agent_male_02"
+            }
+          }
+        ],
+        "nodes": [
+          {
+            "id": "start",
+            "type": "start",
+            "position": {
+              "x": 40.0,
+              "y": 40.0
+            }
+          },
+          {
+            "id": "node_anna",
+            "type": "agent",
+            "agentId": "anna",
+            "position": {
+              "x": 0.0,
+              "y": 140.0
+            }
+          },
+          {
+            "id": "node_luca",
+            "type": "agent",
+            "agentId": "luca",
+            "position": {
+              "x": 0.0,
+              "y": 280.0
+            }
+          },
+          {
+            "id": "node_search",
+            "type": "tool",
+            "tool": "web_search",
+            "position": {
+              "x": 280.0,
+              "y": 290.0
+            }
+          },
+          {
+            "id": "node_gianni",
+            "type": "agent",
+            "agentId": "gianni",
+            "position": {
+              "x": 0.0,
+              "y": 420.0
+            }
+          },
+          {
+            "id": "node_email",
+            "type": "tool",
+            "tool": "send_email",
+            "position": {
+              "x": 280.0,
+              "y": 430.0
+            }
+          },
+          {
+            "id": "end",
+            "type": "end",
+            "position": {
+              "x": 40.0,
+              "y": 560.0
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "e_start_anna",
+            "source": "start",
+            "target": "node_anna"
+          },
+          {
+            "id": "e_anna_luca",
+            "source": "node_anna",
+            "target": "node_luca"
+          },
+          {
+            "id": "e_luca_search",
+            "source": "node_luca",
+            "target": "node_search"
+          },
+          {
+            "id": "e_luca_gianni",
+            "source": "node_luca",
+            "target": "node_gianni"
+          },
+          {
+            "id": "e_gianni_email",
+            "source": "node_gianni",
+            "target": "node_email"
+          },
+          {
+            "id": "e_gianni_end",
+            "source": "node_gianni",
+            "target": "end"
+          }
+        ],
+        "id": "demo"
+      },
+      "v2": {
+        "schemaVersion": 2,
+        "name": "Sales report demo",
+        "input": "Find the latest sales number and send it to management.",
+        "rooms": [
+          {
+            "id": "office",
+            "name": "Office"
+          }
+        ],
+        "agents": [
+          {
+            "id": "anna",
+            "name": "Anna",
+            "role": "Manager",
+            "roomId": "office",
+            "instances": 1,
+            "model": {
+              "provider": "fake",
+              "name": "scripted-v1",
+              "script": {
+                "message": "Find the latest sales number."
+              }
+            },
+            "systemPrompt": "Coordinate the task and delegate work.",
+            "appearance": {
+              "sprite": "agent_female_01"
+            }
+          },
+          {
+            "id": "luca",
+            "name": "Luca",
+            "role": "Researcher",
+            "roomId": "office",
+            "instances": 1,
+            "model": {
+              "provider": "fake",
+              "name": "scripted-v1",
+              "script": {
+                "message": "Send this result to management: {result}"
+              }
+            },
+            "systemPrompt": "Research the request using the available tools and report the findings.",
+            "appearance": {
+              "sprite": "agent_male_01"
+            }
+          },
+          {
+            "id": "gianni",
+            "name": "Gianni",
+            "role": "Communication",
+            "roomId": "office",
+            "instances": 1,
+            "model": {
+              "provider": "fake",
+              "name": "scripted-v1"
+            },
+            "systemPrompt": "Deliver results to the right people.",
+            "appearance": {
+              "sprite": "agent_male_02"
+            }
+          }
+        ],
+        "tables": [],
+        "relations": [
+          {
+            "id": "r1",
+            "subject": "anna",
+            "verb": "is_entry"
+          },
+          {
+            "id": "r2",
+            "subject": "anna",
+            "verb": "sends_to",
+            "object": "luca"
+          },
+          {
+            "id": "r3",
+            "subject": "luca",
+            "verb": "uses_tool",
+            "object": "web_search"
+          },
+          {
+            "id": "r4",
+            "subject": "luca",
+            "verb": "sends_to",
+            "object": "gianni"
+          },
+          {
+            "id": "r5",
+            "subject": "gianni",
+            "verb": "uses_tool",
+            "object": "send_email"
+          },
+          {
+            "id": "r6",
+            "subject": "gianni",
+            "verb": "is_exit"
+          }
+        ],
+        "budgets": {
+          "maxEvents": 5000,
+          "maxTurnsPerAgent": 100,
+          "maxToolCallsPerTurn": 10
+        },
+        "layout": {
+          "positions": {}
+        }
+      }
+    },
+    {
+      "name": "an office nobody wired up, with a table",
+      "v1": {
+        "name": "Draft",
+        "input": "",
+        "agents": [
+          {
+            "id": "x",
+            "name": "X",
+            "tools": [
+              {
+                "name": "web_search"
+              }
+            ]
+          },
+          {
+            "id": "y",
+            "name": "Y"
+          }
+        ],
+        "tables": [
+          {
+            "id": "board",
+            "name": "Board",
+            "mode": "shared",
+            "scope": "room"
+          }
+        ],
+        "nodes": [
+          {
+            "id": "start",
+            "type": "start"
+          },
+          {
+            "id": "end",
+            "type": "end"
+          },
+          {
+            "id": "nx",
+            "type": "agent",
+            "agentId": "x"
+          }
+        ],
+        "edges": [
+          {
+            "id": "loop",
+            "source": "nx",
+            "target": "nx"
+          },
+          {
+            "id": "ghost",
+            "source": "nx",
+            "target": "nowhere"
+          }
+        ]
+      },
+      "v2": {
+        "schemaVersion": 2,
+        "name": "Draft",
+        "input": "",
+        "rooms": [
+          {
+            "id": "office",
+            "name": "Office"
+          }
+        ],
+        "agents": [
+          {
+            "id": "x",
+            "name": "X",
+            "role": "",
+            "roomId": "office",
+            "instances": 1,
+            "model": {
+              "provider": "fake",
+              "name": "scripted-v1"
+            },
+            "systemPrompt": "",
+            "appearance": {
+              "sprite": "agent_male_01"
+            }
+          },
+          {
+            "id": "y",
+            "name": "Y",
+            "role": "",
+            "roomId": "office",
+            "instances": 1,
+            "model": {
+              "provider": "fake",
+              "name": "scripted-v1"
+            },
+            "systemPrompt": "",
+            "appearance": {
+              "sprite": "agent_male_01"
+            }
+          }
+        ],
+        "tables": [
+          {
+            "id": "board",
+            "name": "Board",
+            "mode": "shared",
+            "scope": "room",
+            "roomId": "office"
+          }
+        ],
+        "relations": [
+          {
+            "id": "r1",
+            "subject": "x",
+            "verb": "uses_tool",
+            "object": "web_search"
+          }
+        ],
+        "budgets": {
+          "maxEvents": 5000,
+          "maxTurnsPerAgent": 100,
+          "maxToolCallsPerTurn": 10
+        },
+        "layout": {
+          "positions": {}
+        }
+      }
+    },
+    {
+      "name": "no graph at all, only agents that still list their tools",
+      "v1": {
+        "agents": [
+          {
+            "id": "solo",
+            "name": "Solo",
+            "tools": [
+              {
+                "name": "calculator"
+              },
+              {
+                "name": "calculator"
+              },
+              {
+                "name": "web_search"
+              }
+            ]
+          }
+        ]
+      },
+      "v2": {
+        "schemaVersion": 2,
+        "name": "Untitled workflow",
+        "input": "",
+        "rooms": [
+          {
+            "id": "office",
+            "name": "Office"
+          }
+        ],
+        "agents": [
+          {
+            "id": "solo",
+            "name": "Solo",
+            "role": "",
+            "roomId": "office",
+            "instances": 1,
+            "model": {
+              "provider": "fake",
+              "name": "scripted-v1"
+            },
+            "systemPrompt": "",
+            "appearance": {
+              "sprite": "agent_male_01"
+            }
+          }
+        ],
+        "tables": [],
+        "relations": [
+          {
+            "id": "r1",
+            "subject": "solo",
+            "verb": "uses_tool",
+            "object": "calculator"
+          },
+          {
+            "id": "r2",
+            "subject": "solo",
+            "verb": "uses_tool",
+            "object": "web_search"
+          }
+        ],
+        "budgets": {
+          "maxEvents": 5000,
+          "maxTurnsPerAgent": 100,
+          "maxToolCallsPerTurn": 10
+        },
+        "layout": {
+          "positions": {}
+        }
+      }
+    }
+  ]
+}

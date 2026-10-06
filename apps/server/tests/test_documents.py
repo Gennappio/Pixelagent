@@ -1,16 +1,14 @@
+from office import DEMO_INPUT, run
+
 from server.documents.models import INPUT_DOCUMENT_ID, filed_by, in_hand, in_tray, on_table, out_tray
 from server.documents.registry import DocumentRegistry
 from server.events.models import AgentEventType as T
 from server.events.models import EventDraft
-from server.runtime.simple_runtime import SimpleRuntime
-from server.tools.base import default_registry
 from server.workflow.demo import demo_workflow
-
-DEMO_INPUT = "Find the latest sales number and send it to management."
 
 
 async def demo_drafts():
-    return [draft async for draft in SimpleRuntime(default_registry()).run(demo_workflow(), DEMO_INPUT)]
+    return await run(demo_workflow(), DEMO_INPUT)
 
 
 def place_after(drafts, count, document_id):

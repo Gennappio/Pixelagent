@@ -1,3 +1,4 @@
+import { entryOf, exitOf, toolsInUse } from "../protocol/relations";
 import type { Position, Workflow } from "../protocol/workflow";
 
 export const ROOM = { width: 640, height: 400, wall: 56 };
@@ -18,6 +19,7 @@ export interface LayoutTable {
 /** Where things stand in the room. Derived from the workflow alone, so it is reproducible. */
 export interface WorldLayout {
   agents: LayoutAgent[];
+  /** One station per tool some agent can use. Stations are not placed by hand. */
   tools: string[];
   homes: Record<string, Position>;
   stations: Record<string, Position>;
@@ -34,16 +36,6 @@ function spread(count: number, index: number, from: number, to: number): number 
   return from + ((to - from) * (index + 1)) / (count + 1);
 }
 
-/** The agent Start leads to and the agent that leads to End, as far as the graph says. */
-export function terminalAgents(workflow: Workflow): { entry?: string; exit?: string } {
-  const node = (id: string | undefined) => workflow.nodes.find((candidate) => candidate.id === id);
-  const start = workflow.nodes.find((candidate) => candidate.type === "start");
-  const end = workflow.nodes.find((candidate) => candidate.type === "end");
-  const first = workflow.edges.find((edge) => edge.source === start?.id && node(edge.target)?.type === "agent");
-  const last = workflow.edges.find((edge) => edge.target === end?.id && node(edge.source)?.type === "agent");
-  return { entry: node(first?.target)?.agentId, exit: node(last?.source)?.agentId };
-}
-
 export function buildLayout(workflow: Workflow): WorldLayout {
   const agents = workflow.agents.map(({ id, name, role, appearance }) => ({
     id,
@@ -51,22 +43,19 @@ export function buildLayout(workflow: Workflow): WorldLayout {
     role,
     sprite: appearance.sprite,
   }));
-  const tools = [
-    ...new Set([
-      ...workflow.nodes.flatMap((node) => (node.type === "tool" && node.tool ? [node.tool] : [])),
-      ...workflow.agents.flatMap((agent) => agent.tools.map((tool) => tool.name)),
-    ]),
-  ];
-  const tables = (workflow.tables ?? []).map(({ id, name, mode }) => ({ id, name: name || id, mode }));
+  const tools = toolsInUse(workflow);
+  const tables = workflow.tables.map(({ id, name, mode }) => ({ id, name: name || id, mode }));
 
-  // Tables take the front of the room, so the agents stand a little further back.
-  const front = tables.length > 0 ? 250 : 280;
+  // Many agents stand in two rows, so that neighbours do not overlap. Tables take the front
+  // of the room, so with tables the agents stand further back, and two rows closer together.
+  const twoRows = agents.length > 4;
+  const front = tables.length === 0 ? 280 : twoRows ? 232 : 250;
+  const second = front + (tables.length === 0 ? 60 : 50);
   const homes: Record<string, Position> = {};
   agents.forEach((agent, index) => {
     homes[agent.id] = {
       x: Math.round(spread(agents.length, index, 20, ROOM.width - 20)),
-      // Alternate rows so neighbours do not overlap when there are many agents.
-      y: agents.length > 4 && index % 2 === 1 ? front + 60 : front,
+      y: twoRows && index % 2 === 1 ? second : front,
     };
   });
 
@@ -75,7 +64,8 @@ export function buildLayout(workflow: Workflow): WorldLayout {
     stations[tool] = { x: Math.round(spread(tools.length, index, 60, ROOM.width - 60)), y: ROOM.wall + 44 };
   });
 
-  const { entry, exit } = terminalAgents(workflow);
+  const entry = entryOf(workflow)?.id;
+  const exit = exitOf(workflow)?.id;
   const trays: WorldLayout["trays"] = {};
   if (entry && homes[entry]) trays.in = { x: homes[entry].x - TRAY_OFFSET, y: homes[entry].y + 6 };
   if (exit && homes[exit]) trays.out = { x: homes[exit].x + TRAY_OFFSET, y: homes[exit].y + 6 };

@@ -49,10 +49,10 @@ describe("laneSpans", () => {
   });
 
   it("frees a table once the sheet is on it", () => {
-    const written = eventOfType("DOCUMENT_WRITTEN", "anna", tablesEvents);
+    const written = eventOfType("DOCUMENT_WRITTEN", "sorter", tablesEvents);
     const spans = spansOf(written);
     expect(spans.get("table:todo")).toBe(types(written).indexOf("PLACE_DOCUMENT"));
-    expect(spans.get("agent:anna")).toBe(types(written).indexOf("RETURN_TO_POSITION"));
+    expect(spans.get("agent:sorter")).toBe(types(written).indexOf("RETURN_TO_POSITION"));
   });
 
   it("keeps everyone involved waiting through a pause", () => {

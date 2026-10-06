@@ -3,7 +3,7 @@ import { foldDocuments } from "../protocol/documents";
 import { demoEvents, tablesEvents } from "../testing/demoRun";
 import { contentText, describePlace, describeTouch, excerpt } from "./documentView";
 
-const names = { anna: "Anna", luca: "Luca", gianni: "Gianni", board: "Board", todo: "To research" };
+const names = { anna: "Anna", luca: "Luca", gianni: "Gianni", sorter: "Sorter", stapler: "Stapler", board: "Board", todo: "To research", done: "Researched" };
 
 describe("describePlace", () => {
   it("names every place a sheet can be", () => {
@@ -30,21 +30,28 @@ describe("describeTouch", () => {
   });
 
   it("tells the story of a sheet rewritten on a shared table", () => {
-    expect(history(tablesEvents, "doc_3")).toEqual([
-      "#6 Anna put it on the table “Board”",
-      "#10 Luca read it on the table “Board”",
-      "#13 Luca put version 2 on the table “Board”",
-      "#19 Luca put version 3 on the table “Board”",
-      "#25 Gianni read it on the table “Board”",
+    expect(history(tablesEvents, "doc_5")).toEqual([
+      "#17 Luca put it on the table “Board”",
+      "#25 Luca put version 2 on the table “Board”",
+      "#35 Gianni read it on the table “Board”",
     ]);
   });
 
   it("tells the story of a sheet taken from a pile", () => {
-    expect(history(tablesEvents, "doc_1")).toEqual([
-      "#4 Anna put it on the table “To research”",
-      "#9 Luca took it from the table “To research”",
-      "#14 Luca filed it",
+    expect(history(tablesEvents, "doc_2")).toEqual([
+      "#8 Sorter put it on the table “To research”",
+      "#12 Luca took it from the table “To research”",
+      "#18 Luca filed it",
     ]);
+  });
+
+  it("tells the story of a sheet a collector gathered and passed on", () => {
+    expect(history(tablesEvents, "doc_4")).toEqual([
+      "#16 Luca put it on the table “Researched”",
+      "#28 Stapler took it from the table “Researched”",
+      "#32 Stapler filed it",
+    ]);
+    expect(history(tablesEvents, "doc_7")).toEqual(["#31 Stapler handed it to Gianni", "#33 Gianni received it from Stapler", "#39 Gianni filed it"]);
   });
 
   it("has a sentence for a result nobody signed", () => {

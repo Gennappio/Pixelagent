@@ -35,6 +35,8 @@ export const api = {
   getRun: (id: string) => request<Run>(`/runs/${id}`),
   getRunEvents: (id: string) => request<AgentEvent[]>(`/runs/${id}/events`),
   exportRun: (id: string) => request<{ run: Run; events: AgentEvent[] }>(`/runs/${id}/export`),
+  /** Asks a run to stop. `stopping` is false when it had already ended. */
+  stopRun: (id: string) => request<{ stopping: boolean }>(`/runs/${id}/stop`, { method: "POST" }),
 };
 
 /** Streams a run's events (stored ones first, then live). Returns a function that closes the stream. */

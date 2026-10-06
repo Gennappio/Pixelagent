@@ -1,4 +1,4 @@
-import { Container, Graphics, Text } from "pixi.js";
+import { Container, Graphics, Rectangle, Text } from "pixi.js";
 import type { LayoutTable } from "./layout";
 
 const INK = 0x1a1c2c;
@@ -33,7 +33,9 @@ export class Tray extends Container {
 
 /** A table sheets are left on. A pile has a tray to stack them in; a shared table is bare. */
 export class TableSprite extends Container {
-  constructor(table: LayoutTable) {
+  private outline = new Graphics().rect(-40, -14, 80, 48).stroke({ color: 0xffd166, width: 2 });
+
+  constructor(table: LayoutTable, onClick: (tableId: string) => void) {
     super();
     const top = new Graphics()
       .rect(-36, -10, 72, 16)
@@ -48,6 +50,15 @@ export class TableSprite extends Container {
     if (table.mode === "pile") top.rect(-10, -9, 20, 13).fill(0x4b526d).stroke({ color: INK, width: 1.5 });
     const label = caption(table.name, 9);
     label.y = 18;
-    this.addChild(top, label);
+    this.outline.visible = false;
+    this.addChild(this.outline, top, label);
+    this.eventMode = "static";
+    this.cursor = "pointer";
+    this.hitArea = new Rectangle(-40, -14, 80, 48);
+    this.on("pointertap", () => onClick(table.id));
+  }
+
+  setSelected(selected: boolean): void {
+    this.outline.visible = selected;
   }
 }

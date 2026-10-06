@@ -84,7 +84,7 @@ export function App() {
 
       <main className="stage" style={geometry}>
         <WorldView insets={insets} />
-        {panels.graph && <GraphOverlay workflow={shown} editable={mode === "build"} resetKey={run?.id ?? workflow.id} />}
+        {panels.graph && <GraphOverlay workflow={shown} executed={mode !== "build"} resetKey={run?.id ?? workflow.id} />}
 
         <div className="hud-column left">
           <Panel id="office" title="Office" hotkey="O" className="office-panel">

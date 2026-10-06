@@ -25,6 +25,7 @@ export interface WorldCallbacks {
   onBubbleClick: (eventId: string) => void;
   onStationClick: (tool: string) => void;
   onDocumentClick: (documentId: string) => void;
+  onTableClick: (tableId: string) => void;
   /** A click on empty floor. */
   onFloorClick: () => void;
 }
@@ -34,6 +35,7 @@ export interface WorldSelection {
   agentId?: string;
   tool?: string;
   documentId?: string;
+  tableId?: string;
 }
 
 function drawRoom(): Graphics {
@@ -70,6 +72,7 @@ export class PixelWorld {
   private agents = new Map<string, AgentSprite>();
   private bubbles = new Map<string, SpeechBubble>();
   private stations = new Map<string, ToolStation>();
+  private tables = new Map<string, TableSprite>();
   /** Sheets come and go during a run, so their sprites are made and dropped as needed. */
   private sheets = new Map<string, DocumentSprite>();
 
@@ -150,6 +153,7 @@ export class PixelWorld {
       sprite.update(agent, clock, this.selection.agentId === agentId);
       this.bubbles.get(agentId)?.update(agent.speechBubble, agent.position.x, agent.position.y);
     }
+    for (const [tableId, table] of this.tables) table.setSelected(this.selection.tableId === tableId);
     this.drawSheets(state, layout);
   };
 
@@ -182,6 +186,7 @@ export class PixelWorld {
     this.agents.clear();
     this.bubbles.clear();
     this.stations.clear();
+    this.tables.clear();
     this.sheets.clear();
 
     for (const kind of ["in", "out"] as const) {
@@ -194,9 +199,10 @@ export class PixelWorld {
     }
     for (const table of layout.tables) {
       const at = layout.tablePositions[table.id];
-      const sprite = new TableSprite(table);
+      const sprite = new TableSprite(table, this.callbacks.onTableClick);
       sprite.position.set(at.x, at.y);
       sprite.zIndex = at.y;
+      this.tables.set(table.id, sprite);
       this.agentLayer.addChild(sprite);
     }
 

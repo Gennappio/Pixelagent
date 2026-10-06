@@ -16,6 +16,11 @@ export async function runWorkflow(): Promise<void> {
   }
 }
 
+/** Stops the live run on screen. */
+export async function stopRun(): Promise<void> {
+  await useRunStore.getState().stop();
+}
+
 /** Takes the run off the screen: the world goes back to previewing the workflow. */
 export function backToBuild(): void {
   useRunStore.getState().close();
