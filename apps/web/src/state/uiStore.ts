@@ -13,6 +13,7 @@ export type Selection =
   | { kind: "agent"; agentId: string }
   | { kind: "event"; eventId: string }
   | { kind: "tool"; tool: string }
+  | { kind: "document"; documentId: string }
   | null;
 
 type PanelStorage = Parameters<typeof savePanels>[0];

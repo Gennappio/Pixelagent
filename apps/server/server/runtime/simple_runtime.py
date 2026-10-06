@@ -6,6 +6,8 @@ import time
 from collections.abc import AsyncIterator
 from typing import Any
 
+from server.documents.models import INPUT_DOCUMENT_ID
+from server.documents.registry import DocumentRegistry
 from server.events.models import AgentEventType as T
 from server.events.models import EventDraft
 from server.runtime.base import AgentRuntime, AgentRuntimeError
@@ -25,8 +27,17 @@ def elapsed_ms(started: float) -> int:
     return round((time.perf_counter() - started) * 1000)
 
 
+def sheet(document_id: str, title: str, version: int = 1) -> dict[str, Any]:
+    """The fields that identify a document inside an event payload."""
+    return {"documentId": document_id, "version": version, "title": title}
+
+
 class SimpleRuntime(AgentRuntime):
     """Sequential hand-off runtime: each agent uses its tools, then briefs the next one.
+
+    What passes between agents is a document: the task is `doc_input`, every
+    message is a new sheet handed to the next agent, and the last agent's output
+    is the result sheet. Ids are minted here, never by the UI.
 
     `pace` is a pause (seconds) between steps so a live run is watchable. It only
     stretches execution time; visualization time is the frontend's business.
@@ -49,9 +60,20 @@ class SimpleRuntime(AgentRuntime):
         return model
 
     async def run(self, workflow: Workflow, run_input: str) -> AsyncIterator[EventDraft]:
-        yield EventDraft(
-            T.RUN_STARTED,
-            payload={"workflowId": workflow.id, "workflowName": workflow.name, "input": run_input},
+        documents = DocumentRegistry()
+
+        def record(draft: EventDraft) -> EventDraft:
+            # The run's own view of its documents follows exactly what it emits.
+            documents.apply(draft)
+            return draft
+
+        # The sheet the next agent starts from: the task first, then each message.
+        incoming = sheet(INPUT_DOCUMENT_ID, "Task")
+        yield record(
+            EventDraft(
+                T.RUN_STARTED,
+                payload={"workflowId": workflow.id, "workflowName": workflow.name, "input": run_input, **incoming},
+            )
         )
         steps = build_plan(workflow)
 
@@ -64,17 +86,29 @@ class SimpleRuntime(AgentRuntime):
             started = time.perf_counter()
 
             if sender is not None:
-                yield EventDraft(T.MESSAGE_RECEIVED, agent.id, sender.id, {"content": message})
+                yield record(EventDraft(T.MESSAGE_RECEIVED, agent.id, sender.id, {"content": message, **incoming}))
             await asyncio.sleep(self._pace)
-            yield EventDraft(
-                T.AGENT_STARTED,
-                agent.id,
-                payload={"input": message, "role": agent.role, "model": agent.model.to_wire()},
+            yield record(
+                EventDraft(
+                    T.AGENT_STARTED,
+                    agent.id,
+                    payload={
+                        "input": message,
+                        "role": agent.role,
+                        "model": agent.model.to_wire(),
+                        "documentIds": [incoming["documentId"]],
+                    },
+                )
             )
 
             context: list[ContextItem] = [
                 {"kind": "system", "content": agent.system_prompt},
-                {"kind": "message", "from": sender.id if sender else "user", "content": message},
+                {
+                    "kind": "message",
+                    "from": sender.id if sender else "user",
+                    "content": message,
+                    "documentId": incoming["documentId"],
+                },
             ]
 
             for tool_name in step.tools:
@@ -123,21 +157,31 @@ class SimpleRuntime(AgentRuntime):
                     payload={"kind": "handoff", "summary": rationale, "target": recipient.id},
                 )
                 await asyncio.sleep(self._pace)
-                context.append({"kind": "message_out", "to": recipient.id, "content": output})
-                yield EventDraft(T.MESSAGE_SENT, agent.id, recipient.id, {"content": output})
+                incoming = sheet(documents.next_document_id(), f"Message to {recipient.name}")
+                context.append(
+                    {"kind": "message_out", "to": recipient.id, "content": output, "documentId": incoming["documentId"]}
+                )
+                yield record(EventDraft(T.MESSAGE_SENT, agent.id, recipient.id, {"content": output, **incoming}))
             else:
                 context.append({"kind": "output", "content": output})
 
             # The full context snapshot makes each agent's state at hand-off part of the saved log.
-            yield EventDraft(
-                T.AGENT_FINISHED,
-                agent.id,
-                payload={
-                    "output": output,
-                    "context": context,
-                    "metrics": {"durationMs": elapsed_ms(started), "model": agent.model.name},
-                },
+            yield record(
+                EventDraft(
+                    T.AGENT_FINISHED,
+                    agent.id,
+                    payload={
+                        "output": output,
+                        "context": context,
+                        "metrics": {"durationMs": elapsed_ms(started), "model": agent.model.name},
+                    },
+                )
             )
             message, sender = output, agent
 
-        yield EventDraft(T.RUN_FINISHED, payload={"output": message})
+        # The last agent's output leaves the office as the result sheet.
+        result = sheet(documents.next_document_id(), "Result")
+        payload: dict[str, Any] = {"output": message, **result}
+        if sender is not None:
+            payload["authorId"] = sender.id
+        yield record(EventDraft(T.RUN_FINISHED, payload=payload))

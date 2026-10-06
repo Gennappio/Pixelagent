@@ -47,12 +47,23 @@ export interface WorkflowEdge {
   target: string;
 }
 
+/** Where documents are left for random access instead of being handed over. */
+export interface WorkflowTable {
+  id: string;
+  name: string;
+  /** shared: one versioned document per title. pile: a queue, taken one at a time. */
+  mode: "shared" | "pile";
+  scope: "room" | "global";
+}
+
 export interface Workflow {
   id: string;
   name: string;
   /** Default task handed to the first agent. */
   input: string;
   agents: Agent[];
+  /** Absent in workflows saved before tables existed. */
+  tables?: WorkflowTable[];
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
 }
@@ -83,6 +94,14 @@ export interface ToolDescription {
   name: string;
   description: string;
   schema: Record<string, unknown>;
+}
+
+/** What to call each agent and each table of a workflow, by id. */
+export function namesOf(workflow: Workflow): Record<string, string> {
+  return Object.fromEntries([
+    ...workflow.agents.map((agent) => [agent.id, agent.name]),
+    ...(workflow.tables ?? []).map((table) => [table.id, table.name || table.id]),
+  ]);
 }
 
 export function toolLabel(tool: string): string {

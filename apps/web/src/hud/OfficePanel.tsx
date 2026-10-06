@@ -2,8 +2,11 @@ import { useMemo, useRef } from "react";
 import { api } from "../api/client";
 import { formatTime } from "../debugger/transcript";
 import { addAgent, addToolNode } from "../graph/workflowEdits";
-import { toolLabel } from "../protocol/workflow";
+import { describePlace } from "../inspector/documentView";
+import { foldDocuments, latestVersion } from "../protocol/documents";
+import { namesOf, toolLabel } from "../protocol/workflow";
 import { backToBuild } from "../state/actions";
+import { replay, useReplay } from "../state/replayStore";
 import { useRunStore } from "../state/runStore";
 import { useUiStore } from "../state/uiStore";
 import { useWorkflowStore } from "../state/workflowStore";
@@ -59,6 +62,14 @@ export function OfficePanel() {
   /** With a run on screen the lists describe what was executed, not what is being edited. */
   const shown = run?.workflow ?? workflow;
   const placed = useMemo(() => buildLayout(shown).tools, [shown]);
+  const names = useMemo(() => namesOf(shown), [shown]);
+  // Every sheet of the run as of the playhead, filed ones included: those are out of
+  // sight in the world, and this list is how to get back to them.
+  const { position, total } = useReplay();
+  const sheets = useMemo(() => {
+    const registry = foldDocuments(replay.log.slice(0, position));
+    return registry.order.map((id) => registry.documents[id]);
+  }, [position, total]);
 
   const workflowFile = useJsonFile((data) => {
     if (!Array.isArray(data?.agents) || !Array.isArray(data?.nodes)) return alert("That file is not a workflow.");
@@ -206,6 +217,29 @@ export function OfficePanel() {
           {!building && placed.length === 0 && <li className="muted">This run used no tools.</li>}
         </ul>
       </Section>
+
+      {!building && (
+        <Section id="office.sheets" title="Sheets">
+          <ul className="list">
+            {sheets.map((record) => (
+              <li
+                key={record.id}
+                className={`row clickable sheet-row${selection?.kind === "document" && selection.documentId === record.id ? " selected" : ""}`}
+                title={describePlace(record.place, names)}
+                onClick={() => select({ kind: "document", documentId: record.id })}
+              >
+                <span className={`sheet-icon${record.place.kind === "filed" ? " filed" : ""}`} />
+                <span className="sheet-title">
+                  {latestVersion(record).title || record.id}
+                  {record.versions.length > 1 && <small> v{latestVersion(record).version}</small>}
+                </span>
+                <span className="tag">{describePlace(record.place, names)}</span>
+              </li>
+            ))}
+            {sheets.length === 0 && <li className="muted">No sheets yet at this point of the run.</li>}
+          </ul>
+        </Section>
+      )}
 
       <Section
         id="office.runs"

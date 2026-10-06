@@ -15,6 +15,7 @@ export const PANEL_DEFAULTS = {
   "office.workflow": true,
   "office.agents": true,
   "office.tools": true,
+  "office.sheets": true,
   "office.runs": true,
 } satisfies Record<string, boolean>;
 

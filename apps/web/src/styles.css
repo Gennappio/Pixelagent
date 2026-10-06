@@ -778,6 +778,80 @@ button.hint:hover {
   color: var(--live);
 }
 
+/* sheets */
+
+.sheet-icon {
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 11px;
+  margin-right: 6px;
+  vertical-align: -1px;
+  background:
+    linear-gradient(#9aa4bf, #9aa4bf) 2px 3px / 5px 1px no-repeat,
+    linear-gradient(#9aa4bf, #9aa4bf) 2px 6px / 5px 1px no-repeat,
+    #f4f1e8;
+  box-shadow: 0 0 0 1px var(--ink);
+}
+
+/* Put away: still there to read, but no longer on anyone's desk. */
+.sheet-icon.filed {
+  opacity: 0.45;
+}
+
+.section .sheet-icon {
+  margin-right: 0;
+}
+
+.section .row.sheet-row {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+
+.sheet-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-content {
+  padding: 10px 12px;
+  background: #f4f1e8;
+  color: #1a1c2c;
+  border-radius: 2px;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
+  font: 12px/1.5 ui-monospace, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.sheet-content .muted {
+  color: #6b7285;
+}
+
+.sheet-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sheet-links button {
+  display: inline-flex;
+  align-items: center;
+}
+
+button.link {
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  color: var(--blueprint);
+  text-decoration: underline;
+}
+
 /* shortcut list */
 
 .help {

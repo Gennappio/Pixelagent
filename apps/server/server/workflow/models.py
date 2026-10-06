@@ -62,6 +62,28 @@ class WorkflowEdge(CamelModel):
     target: str
 
 
+class TableMode(StrEnum):
+    # One document per title, versioned; readers see the latest.
+    SHARED = "shared"
+    # A queue of documents; takers consume them one at a time.
+    PILE = "pile"
+
+
+class TableScope(StrEnum):
+    ROOM = "room"
+    # Visible from every room (the intranet totem).
+    GLOBAL = "global"
+
+
+class WorkflowTable(CamelModel):
+    """Where documents are left for random access instead of being handed over."""
+
+    id: str
+    name: str = ""
+    mode: TableMode = TableMode.SHARED
+    scope: TableScope = TableScope.ROOM
+
+
 class WorkflowDefinition(CamelModel):
     """A workflow as authored in the editor (no server identity yet)."""
 
@@ -69,6 +91,7 @@ class WorkflowDefinition(CamelModel):
     # Default task handed to the first agent when a run does not provide one.
     input: str = ""
     agents: list[Agent] = Field(default_factory=list)
+    tables: list[WorkflowTable] = Field(default_factory=list)
     nodes: list[WorkflowNode] = Field(default_factory=list)
     edges: list[WorkflowEdge] = Field(default_factory=list)
 
@@ -77,6 +100,12 @@ class WorkflowDefinition(CamelModel):
         agent_ids = [agent.id for agent in self.agents]
         if len(set(agent_ids)) != len(agent_ids):
             raise ValueError("agent ids must be unique")
+        table_ids = [table.id for table in self.tables]
+        if len(set(table_ids)) != len(table_ids):
+            raise ValueError("table ids must be unique")
+        # Events name agents and tables by bare id, so one id cannot mean both.
+        if set(table_ids) & set(agent_ids):
+            raise ValueError("a table and an agent cannot share an id")
         node_ids = [node.id for node in self.nodes]
         if len(set(node_ids)) != len(node_ids):
             raise ValueError("node ids must be unique")

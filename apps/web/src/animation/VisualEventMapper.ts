@@ -1,3 +1,4 @@
+import type { VisiblePlace } from "../protocol/documents";
 import { text, type AgentEvent } from "../protocol/events";
 import type { VisualAction } from "./visualActions";
 
@@ -5,6 +6,20 @@ import type { VisualAction } from "./visualActions";
 const SPEECH_HOLD = 1600;
 const THOUGHT_HOLD = 1100;
 const RESULT_HOLD = 1500;
+const READ_HOLD = 700;
+
+/** The sheet an event carries, if it carries one. */
+function sheetOf(event: AgentEvent): { documentId: string; title: string; version: number } | undefined {
+  const { documentId, title, version } = event.payload;
+  if (typeof documentId !== "string" || documentId === "") return undefined;
+  return {
+    documentId,
+    title: typeof title === "string" ? title : "",
+    version: typeof version === "number" && Number.isInteger(version) && version > 0 ? version : 1,
+  };
+}
+
+const hand = (agentId: string): VisiblePlace => ({ kind: "hand", agentId });
 
 /**
  * The single translation layer from the event protocol to visual actions.
@@ -12,16 +27,26 @@ const RESULT_HOLD = 1500;
  */
 export function mapEventToActions(event: AgentEvent): VisualAction[] {
   const actor = event.actorId;
+  const sheet = sheetOf(event);
   switch (event.type) {
-    case "RUN_STARTED":
-      return [{ type: "RESET" }, { type: "WAIT", ms: 300 }];
+    case "RUN_STARTED": {
+      // The task arrives as a sheet in the in-tray.
+      const arrival: VisualAction[] = sheet ? [{ type: "SHOW_DOCUMENT", ...sheet, at: { kind: "tray", tray: "in" } }] : [];
+      return [{ type: "RESET" }, ...arrival, { type: "WAIT", ms: 300 }];
+    }
 
-    case "AGENT_STARTED":
+    case "AGENT_STARTED": {
       if (!actor) return [];
+      const held = Array.isArray(event.payload.documentIds) ? event.payload.documentIds : [];
       return [
         { type: "SET_STATUS", agentId: actor, status: "thinking" },
+        // Picks up what it starts from. A sheet already in its hands does not move.
+        ...held
+          .filter((id): id is string => typeof id === "string")
+          .map((documentId): VisualAction => ({ type: "TAKE_DOCUMENT", documentId, to: hand(actor) })),
         { type: "WAIT", ms: 350 },
       ];
+    }
 
     case "MESSAGE_RECEIVED":
       if (!actor) return [];
@@ -46,8 +71,11 @@ export function mapEventToActions(event: AgentEvent): VisualAction[] {
 
     case "MESSAGE_SENT": {
       if (!actor) return [];
+      const target = event.targetId;
       const actions: VisualAction[] = [];
-      if (event.targetId) actions.push({ type: "MOVE_TO", agentId: actor, target: { kind: "agent", id: event.targetId } });
+      // The message is a sheet: written, carried over, and handed to the other agent.
+      if (sheet) actions.push({ type: "SHOW_DOCUMENT", ...sheet, at: hand(actor) });
+      if (target) actions.push({ type: "MOVE_TO", agentId: actor, target: { kind: "agent", id: target } });
       actions.push(
         { type: "TALK", agentId: actor },
         {
@@ -59,9 +87,9 @@ export function mapEventToActions(event: AgentEvent): VisualAction[] {
           holdMs: SPEECH_HOLD,
         },
         { type: "HIDE_BUBBLE", agentId: actor },
-        { type: "SET_STATUS", agentId: actor, status: "waiting" },
-        { type: "RETURN_TO_POSITION", agentId: actor },
       );
+      if (sheet && target) actions.push({ type: "HAND_DOCUMENT", documentId: sheet.documentId, to: hand(target) });
+      actions.push({ type: "SET_STATUS", agentId: actor, status: "waiting" }, { type: "RETURN_TO_POSITION", agentId: actor });
       return actions;
     }
 
@@ -95,15 +123,60 @@ export function mapEventToActions(event: AgentEvent): VisualAction[] {
       ];
     }
 
+    case "DOCUMENT_WRITTEN": {
+      const tableId = text(event, "tableId");
+      if (!actor || !sheet || !tableId) return [];
+      return [
+        // Written at the desk, or picked back up for a new version, then carried to the table.
+        { type: "SHOW_DOCUMENT", ...sheet, at: hand(actor) },
+        { type: "MOVE_TO", agentId: actor, target: { kind: "table", id: tableId } },
+        { type: "PLACE_DOCUMENT", documentId: sheet.documentId, to: { kind: "table", tableId } },
+        { type: "RETURN_TO_POSITION", agentId: actor },
+      ];
+    }
+
+    case "DOCUMENT_READ": {
+      const tableId = text(event, "tableId");
+      if (!actor || !tableId) return [];
+      return [
+        { type: "MOVE_TO", agentId: actor, target: { kind: "table", id: tableId } },
+        { type: "SET_STATUS", agentId: actor, status: "thinking" },
+        { type: "WAIT", ms: READ_HOLD },
+        { type: "RETURN_TO_POSITION", agentId: actor },
+      ];
+    }
+
+    case "DOCUMENT_TAKEN": {
+      const tableId = text(event, "tableId");
+      if (!actor || !sheet || !tableId) return [];
+      return [
+        { type: "MOVE_TO", agentId: actor, target: { kind: "table", id: tableId } },
+        { type: "TAKE_DOCUMENT", documentId: sheet.documentId, to: hand(actor) },
+        { type: "RETURN_TO_POSITION", agentId: actor },
+      ];
+    }
+
     case "AGENT_FINISHED":
       if (!actor) return [];
       return [
+        { type: "FILE_DOCUMENTS", agentId: actor },
         { type: "SET_STATUS", agentId: actor, status: "idle" },
         { type: "WAIT", ms: 150 },
       ];
 
-    case "RUN_FINISHED":
-      return [{ type: "WAIT", ms: 300 }];
+    case "RUN_FINISHED": {
+      if (!sheet) return [{ type: "WAIT", ms: 300 }];
+      // The result leaves through the out-tray, put there by whoever wrote it.
+      const author = text(event, "authorId");
+      const out: VisiblePlace = { kind: "tray", tray: "out" };
+      const delivery: VisualAction[] = author
+        ? [
+            { type: "SHOW_DOCUMENT", ...sheet, at: hand(author) },
+            { type: "PLACE_DOCUMENT", documentId: sheet.documentId, to: out },
+          ]
+        : [{ type: "SHOW_DOCUMENT", ...sheet, at: out }];
+      return [...delivery, { type: "WAIT", ms: 300 }];
+    }
 
     case "RUN_ERROR":
       // The alert only points at the problem; the real error lives in the event itself.

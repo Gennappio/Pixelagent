@@ -32,6 +32,10 @@ class AgentEventType(StrEnum):
     DECISION = "DECISION"
     TOOL_CALL = "TOOL_CALL"
     TOOL_RESULT = "TOOL_RESULT"
+    # A document placed on a table, read there, or taken from it.
+    DOCUMENT_WRITTEN = "DOCUMENT_WRITTEN"
+    DOCUMENT_READ = "DOCUMENT_READ"
+    DOCUMENT_TAKEN = "DOCUMENT_TAKEN"
     RUN_FINISHED = "RUN_FINISHED"
     RUN_ERROR = "RUN_ERROR"
 

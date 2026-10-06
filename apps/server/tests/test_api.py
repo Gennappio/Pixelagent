@@ -120,4 +120,7 @@ def test_run_export_contains_pipeline_context_and_events(client):
     assert export["events"] == client.get(f"/runs/{run['id']}/events").json()
     finished = [e for e in export["events"] if e["type"] == "AGENT_FINISHED"]
     assert all(e["payload"]["context"] for e in finished)
+    # Documents are not a resource of their own: the events in the export carry them.
+    carried = [e["payload"]["documentId"] for e in export["events"] if "documentId" in e["payload"]]
+    assert list(dict.fromkeys(carried)) == ["doc_input", "doc_1", "doc_2", "doc_3"]
     assert [r["id"] for r in client.get("/runs?workflow_id=demo").json()] == [run["id"]]

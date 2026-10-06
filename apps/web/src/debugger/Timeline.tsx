@@ -18,8 +18,14 @@ export const EVENT_COLOR: Record<AgentEventType, string> = {
   DECISION: "#8ec5ff",
   TOOL_CALL: "#7fe7ff",
   TOOL_RESULT: "#8be28b",
+  DOCUMENT_WRITTEN: "#f4f1e8",
+  DOCUMENT_READ: "#b9a7e8",
+  DOCUMENT_TAKEN: "#e8a45c",
   RUN_ERROR: "#ff5d5d",
 };
+
+/** Events whose connector runs from the other lane to the agent, not away from it. */
+const INBOUND = new Set<AgentEventType>(["TOOL_RESULT", "DOCUMENT_READ", "DOCUMENT_TAKEN"]);
 
 interface Lane {
   id: string;
@@ -30,6 +36,9 @@ interface Lane {
 function linkedLane(event: AgentEvent): string | undefined {
   if (event.type === "MESSAGE_SENT") return event.targetId;
   if (event.type === "TOOL_CALL" || event.type === "TOOL_RESULT") return `tool:${String(event.payload.tool)}`;
+  if (event.type === "DOCUMENT_WRITTEN" || event.type === "DOCUMENT_READ" || event.type === "DOCUMENT_TAKEN") {
+    return `table:${String(event.payload.tableId)}`;
+  }
   return undefined;
 }
 
@@ -45,6 +54,7 @@ export function Timeline() {
     { id: "run", label: "Run" },
     ...layout.agents.map((agent) => ({ id: agent.id, label: agent.name })),
     ...layout.tools.map((tool) => ({ id: `tool:${tool}`, label: toolLabel(tool) })),
+    ...layout.tables.map((table) => ({ id: `table:${table.id}`, label: table.name })),
   ];
   const laneY = (id: string | undefined) => {
     const index = lanes.findIndex((lane) => lane.id === id);
@@ -90,8 +100,8 @@ export function Timeline() {
             const y = laneY(event.actorId ?? "run");
             const link = linkedLane(event);
             const linkY = link ? laneY(link) : y;
-            // A tool result travels from the tool back to the agent.
-            const [fromY, toY] = event.type === "TOOL_RESULT" ? [linkY, y] : [y, linkY];
+            // A tool result, a read and a take travel from the other lane back to the agent.
+            const [fromY, toY] = INBOUND.has(event.type) ? [linkY, y] : [y, linkY];
             const color = EVENT_COLOR[event.type];
             const selected = selection?.kind === "event" && selection.eventId === event.id;
             return (

@@ -9,6 +9,9 @@ export type AgentEventType =
   | "DECISION"
   | "TOOL_CALL"
   | "TOOL_RESULT"
+  | "DOCUMENT_WRITTEN"
+  | "DOCUMENT_READ"
+  | "DOCUMENT_TAKEN"
   | "RUN_FINISHED"
   | "RUN_ERROR";
 

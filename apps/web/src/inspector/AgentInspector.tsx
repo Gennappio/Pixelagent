@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { EVENT_COLOR } from "../debugger/Timeline";
+import { documentsTouchedBy, foldDocuments, latestVersion } from "../protocol/documents";
 import type { AgentEvent } from "../protocol/events";
 import { toolLabel, type Agent } from "../protocol/workflow";
 import { backToBuild } from "../state/actions";
@@ -7,9 +8,10 @@ import { replay, useReplay } from "../state/replayStore";
 import { useUiStore } from "../state/uiStore";
 import { spriteFor } from "../world/sprites";
 import { AgentConfigForm } from "./AgentConfigForm";
+import { describePlace, excerpt } from "./documentView";
 import { agentRuntimeView, type AgentRuntimeView } from "./runtimeView";
 
-const TABS = ["Configuration", "Runtime", "Messages", "Tools", "Trace"] as const;
+const TABS = ["Configuration", "Runtime", "Messages", "Tools", "Sheets", "Trace"] as const;
 type Tab = (typeof TABS)[number];
 
 interface Props {
@@ -102,6 +104,11 @@ export function AgentInspector({ agent, editable, names }: Props) {
   const { position } = useReplay();
   // Everything below is "as of the playhead": step back and the inspector steps back too.
   const view = useMemo(() => agentRuntimeView(replay.log.slice(0, position), agent.id), [position, agent.id]);
+  // The sheets this agent wrote, held, read or was handed, as of the playhead.
+  const sheets = useMemo(
+    () => documentsTouchedBy(foldDocuments(replay.log.slice(0, position)), agent.id),
+    [position, agent.id],
+  );
 
   if (editable) {
     // No run on screen: there is nothing to inspect yet, only the agent to configure.
@@ -161,6 +168,25 @@ export function AgentInspector({ agent, editable, names }: Props) {
                 {call.latencyMs !== undefined && <span className="muted"> · {call.latencyMs} ms</span>}
                 <Json value={call.arguments} />
                 {call.result === undefined ? <span className="muted">waiting for result…</span> : <Json value={call.result} />}
+              </li>
+            ))}
+          </ul>
+        ))}
+
+      {tab === "Sheets" &&
+        (sheets.length === 0 ? (
+          <p className="muted">No sheets yet at this point of the run.</p>
+        ) : (
+          <ul className="list">
+            {sheets.map((record) => (
+              <li key={record.id} className="row clickable" onClick={() => select({ kind: "document", documentId: record.id })}>
+                <strong>
+                  <span className="sheet-icon" />
+                  {latestVersion(record).title || record.id}
+                  {record.versions.length > 1 && <small> v{latestVersion(record).version}</small>}
+                </strong>
+                <div>{excerpt(latestVersion(record).content, 80)}</div>
+                <div className="muted">{describePlace(record.place, names)}</div>
               </li>
             ))}
           </ul>

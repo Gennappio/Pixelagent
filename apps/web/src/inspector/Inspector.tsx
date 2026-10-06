@@ -4,6 +4,7 @@ import { useRunStore } from "../state/runStore";
 import { useUiStore } from "../state/uiStore";
 import { useWorkflowStore } from "../state/workflowStore";
 import { AgentInspector } from "./AgentInspector";
+import { DocumentInspector } from "./DocumentInspector";
 import { EventInspector } from "./EventInspector";
 
 function ToolInspector({ tool }: { tool: string }) {
@@ -59,10 +60,12 @@ export function Inspector({ names }: { names: Record<string, string> }) {
     if (event) return <EventInspector event={event} names={names} />;
   }
   if (selection?.kind === "tool") return <ToolInspector tool={selection.tool} />;
+  // Keyed so that picking another sheet goes back to showing its latest version.
+  if (selection?.kind === "document") return <DocumentInspector key={selection.documentId} documentId={selection.documentId} names={names} />;
 
   return (
     <div className="inspector empty">
-      <p>Click a character, a tool, a speech bubble or a timeline event to inspect it.</p>
+      <p>Click a character, a sheet, a tool, a speech bubble or a timeline event to inspect it.</p>
     </div>
   );
 }

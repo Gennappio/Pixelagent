@@ -66,6 +66,34 @@ async def test_demo_workflow_content():
     assert results == ["Sales: €1.2M", "Email sent to management@example.com"]
 
 
+async def test_demo_workflow_passes_documents_between_agents():
+    drafts = await collect(demo_workflow())
+    sheets = [
+        (d.type, d.payload["documentId"], d.payload["version"], d.payload["title"])
+        for d in drafts
+        if "documentId" in d.payload
+    ]
+    assert sheets == [
+        (T.RUN_STARTED, "doc_input", 1, "Task"),
+        (T.MESSAGE_SENT, "doc_1", 1, "Message to Luca"),
+        (T.MESSAGE_RECEIVED, "doc_1", 1, "Message to Luca"),
+        (T.MESSAGE_SENT, "doc_2", 1, "Message to Gianni"),
+        (T.MESSAGE_RECEIVED, "doc_2", 1, "Message to Gianni"),
+        (T.RUN_FINISHED, "doc_3", 1, "Result"),
+    ]
+    # Each agent starts its turn from the sheet it was given.
+    started = [(d.actor_id, d.payload["documentIds"]) for d in drafts if d.type is T.AGENT_STARTED]
+    assert started == [("anna", ["doc_input"]), ("luca", ["doc_1"]), ("gianni", ["doc_2"])]
+    assert drafts[-1].payload["authorId"] == "gianni"
+
+
+async def test_saved_context_points_at_the_sheets_involved():
+    drafts = await collect(demo_workflow())
+    luca = next(d for d in drafts if d.type is T.AGENT_FINISHED and d.actor_id == "luca")
+    referenced = [(item["kind"], item["documentId"]) for item in luca.payload["context"] if "documentId" in item]
+    assert referenced == [("message", "doc_1"), ("message_out", "doc_2")]
+
+
 async def test_demo_workflow_is_deterministic():
     assert without_metrics(await collect(demo_workflow())) == without_metrics(await collect(demo_workflow()))
 
@@ -95,6 +123,29 @@ def test_plan_follows_the_graph_and_attaches_tools():
 
 def edit(**changes) -> Workflow:
     return Workflow.model_validate({**demo_workflow().to_wire(), **changes})
+
+
+def test_tables_are_part_of_the_workflow_and_default_to_none():
+    assert demo_workflow().tables == []
+    with_tables = edit(tables=[{"id": "board", "name": "Board"}, {"id": "todo", "mode": "pile", "scope": "global"}])
+    assert [(t.id, t.mode.value, t.scope.value) for t in with_tables.tables] == [
+        ("board", "shared", "room"),
+        ("todo", "pile", "global"),
+    ]
+    assert Workflow.model_validate(with_tables.to_wire()) == with_tables
+
+
+@pytest.mark.parametrize(
+    "tables, problem",
+    [
+        ([{"id": "board"}, {"id": "board"}], "table ids must be unique"),
+        ([{"id": "anna"}], "cannot share an id"),
+        ([{"id": "board", "mode": "heap"}], "mode"),
+    ],
+)
+def test_invalid_tables_are_rejected(tables, problem):
+    with pytest.raises(ValueError, match=problem):
+        edit(tables=tables)
 
 
 def test_plan_rejects_a_disconnected_graph():

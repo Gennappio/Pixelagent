@@ -10,6 +10,7 @@ import { ShortcutHelp } from "./hud/ShortcutHelp";
 import { TopBar } from "./hud/TopBar";
 import { useShortcuts } from "./hud/useShortcuts";
 import { Inspector } from "./inspector/Inspector";
+import { namesOf } from "./protocol/workflow";
 import { replay } from "./state/replayStore";
 import { useRunStore } from "./state/runStore";
 import { useUiStore } from "./state/uiStore";
@@ -63,7 +64,7 @@ export function App() {
 
   // Names shown in the log and the inspector come from the run when there is one.
   const shown = run?.workflow ?? workflow;
-  const names = useMemo(() => Object.fromEntries(shown.agents.map((agent) => [agent.id, agent.name])), [shown]);
+  const names = useMemo(() => namesOf(shown), [shown]);
 
   const insets = useMemo(() => worldInsets(panels), [panels.office, panels.inspector]);
   const geometry = {

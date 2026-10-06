@@ -146,11 +146,17 @@ Phase 7   world-first shell: the world fills the screen, floating collapsible
           panels remembered across reloads, keyboard shortcuts, BUILD | RUN | REPLAY,
           graph as an overlay (editable in BUILD, read-only for a run),
           selection markers in the world, camera framing beside the open panels
+Phase 8   documents: every message, the task and the result are sheets with an id
+          and versions, carried inside the events; the same fold of the log on the
+          server and on the web, held equal by shared fixtures; sheets, trays and
+          tables in the world, clickable; sheet inspector; tables in the workflow
+          model and the three table events, end to end
 ```
 
-Not done: everything in §38 from Phase 8 on. Until Phase 10 the workflow is
-still the revision 1 node graph and the graph overlay is still where agents
-are connected.
+Not done: everything in §38 from Phase 9 on. Until Phase 10 the workflow is
+still the revision 1 node graph, the graph overlay is still where agents are
+connected, and no runtime emits table events yet: tables are exercised by a
+hand-written log (`tests/fixtures/tables_run.json`).
 
 The deterministic demo in §34 passes and must keep passing after every phase.
 
@@ -312,6 +318,27 @@ requirement that pipeline and context states be savable.
 The run input is document `doc_input`, handed to the entry agent. The exit
 agent's last output is the run output document.
 
+A document is always in exactly one place:
+
+```text
+tray    in     the task, before the entry agent picks it up
+        out    the result, where the exit agent leaves it
+hand    agent  an agent is holding it: handed to it, picked up, or just written
+table   table  lying on a table
+filed   agent  put away by the agent that held it when its turn ended
+```
+
+An agent's turn ends by filing what it holds. Without that, an agent working a
+pile of fifty sheets would end up holding fifty. A filed sheet is out of sight
+in the world and still readable everywhere else.
+
+The fold that reads documents out of a log exists twice, in
+`server/documents/registry.py` and `web/src/protocol/documents.ts`, and must
+give the same answer. `tests/fixtures/*.json` holds logs together with the
+registry they fold to and with the place of every document after each event;
+the server generates and checks them, the web tests fold the same events and
+compare, step by step. Changing one fold means changing the other.
+
 Tables:
 
 ```text
@@ -439,8 +466,9 @@ workflow snapshot stored with the run.
 Payload conventions:
 
 ```text
-RUN_STARTED        workflowId, workflowName, input, documentId: "doc_input"
-MESSAGE_SENT       documentId, version, title?, content, summary?
+RUN_STARTED        workflowId, workflowName, input, documentId: "doc_input", version, title
+AGENT_STARTED      input, role, model, documentIds[]: the sheets the turn starts from
+MESSAGE_SENT       documentId, version, title, content, summary?
 MESSAGE_RECEIVED   same as MESSAGE_SENT
 DECISION           kind: "tool_selection" | "routing" | "handoff" | "budget", summary,
                    relationId? (routing), tool? (tool_selection)
@@ -450,9 +478,14 @@ DOCUMENT_WRITTEN   tableId, documentId, version, title, content, summary?
 DOCUMENT_READ      tableId, documentIds[]
 DOCUMENT_TAKEN     tableId, documentId, remaining
 AGENT_FINISHED     output, context[], metrics { durationMs, model, tokens?, costUsd? }
-RUN_FINISHED       output, documentId?
+RUN_FINISHED       output, documentId, version, title, authorId: who wrote the result
 RUN_ERROR          message, errorType ("BudgetExceeded", "Deadlock", "ToolError", …)
 ```
+
+A document's content is the event's `content`, except for the task
+(`RUN_STARTED.input`) and the result (`RUN_FINISHED.output`). Every document
+field is optional to a reader: a log written before documents existed has
+none, folds to no documents, and still replays.
 
 `DECISION` is an explicit, intentionally emitted rationale or routing choice.
 Hidden chain-of-thought is never an observable artifact.
@@ -618,21 +651,31 @@ Pure: same event, same actions. Nothing else in the UI maps events to
 animation.
 
 ```text
-MESSAGE_SENT (same room)     MOVE_TO(target), TALK, SHOW_BUBBLE, HAND_DOCUMENT, SET_STATUS(waiting), RETURN
+RUN_STARTED                  RESET, SHOW_DOCUMENT(task, in-tray)
+AGENT_STARTED                SET_STATUS(thinking), TAKE_DOCUMENT for each sheet it starts from
+MESSAGE_SENT (same room)     SHOW_DOCUMENT(sheet, sender's hand), MOVE_TO(target), TALK, SHOW_BUBBLE,
+                             HAND_DOCUMENT(target), SET_STATUS(waiting), RETURN
 MESSAGE_SENT (other room)    MOVE_TO(phone|fax), TALK, RING_PHONE(target room) | FAX_SEND, RETURN
 TOOL_CALL                    MOVE_TO(station), WORK, SHOW_TOOL_ICON
 TOOL_RESULT                  SHOW_BUBBLE(result), HIDE_TOOL_ICON, RETURN
-DOCUMENT_WRITTEN             MOVE_TO(table), PLACE_DOCUMENT, RETURN
+DOCUMENT_WRITTEN             SHOW_DOCUMENT(sheet, writer's hand), MOVE_TO(table), PLACE_DOCUMENT, RETURN
 DOCUMENT_READ                MOVE_TO(table), WAIT(read), RETURN
 DOCUMENT_TAKEN               MOVE_TO(table), TAKE_DOCUMENT, RETURN
 DECISION                     SHOW_BUBBLE(thought)
-RUN_STARTED                  RESET, document doc_input appears in the entry agent's in-tray
-RUN_FINISHED                 output document moves to the exit agent's out-tray
+AGENT_FINISHED               FILE_DOCUMENTS(agent), SET_STATUS(idle)
+RUN_FINISHED                 SHOW_DOCUMENT(result, author's hand), PLACE_DOCUMENT(out-tray)
 RUN_ERROR                    SHOW_ALERT, SHOW_BUBBLE(error)
 ```
 
-New visual actions: `HAND_DOCUMENT`, `PLACE_DOCUMENT`, `TAKE_DOCUMENT`,
-`RING_PHONE`, `FAX_SEND`. Camera focus is a UI concern, not a visual action.
+Document actions: `SHOW_DOCUMENT` puts a sheet somewhere at once (just written,
+or a new version of it); `HAND_DOCUMENT`, `PLACE_DOCUMENT` and `TAKE_DOCUMENT`
+make it travel, and cost no time when it is already there; `FILE_DOCUMENTS`
+takes an agent's sheets off the scene. Still to come with rooms: `RING_PHONE`,
+`FAX_SEND`. Camera focus is a UI concern, not a visual action.
+
+The in-tray stands by the entry agent and the out-tray by the exit agent. The
+sheets the world shows after any event are exactly the documents the registry
+says are not filed, in the same places: a test holds the two folds together.
 
 ---
 
@@ -828,13 +871,14 @@ the world. Speech bubbles show abbreviated content; clicking expands.
 ```text
 pixel-agents/
   workflows/                one JSON file per workflow (schema version 2)
+  tests/fixtures/           event logs both test suites read (§33)
   tools/
     mcp.json                MCP server registry
     <name>/server.py        custom MCP servers
   apps/server/server/
     main.py
     events/                 models.py, emitter.py
-    documents/              models.py, registry.py (fold of the log)
+    documents/              models.py, registry.py (fold of the log; twin of web protocol/documents.ts)
     runtime/
       base.py               AgentRuntime
       office_runtime.py     scheduler + turns + budgets
@@ -847,15 +891,16 @@ pixel-agents/
   apps/web/src/
     protocol/               events.ts, workflow.ts, documents.ts
     animation/              VisualEventMapper.ts, AnimationScheduler.ts, lanes.ts, visualActions.ts
-    world/                  PixelWorld.ts, AgentSprite.ts, DocumentSprite.ts, Table.ts, Room.ts,
-                            Devices.ts, ToolStation.ts, SpeechBubble.ts, Camera.ts, layout.ts, worldState.ts
+    world/                  PixelWorld.ts, AgentSprite.ts, DocumentSprite.ts, Furniture.ts (trays, tables),
+                            Room.ts, Devices.ts, ToolStation.ts, SpeechBubble.ts, Camera.ts, layout.ts,
+                            worldState.ts
     build/                  BuildMode.tsx, ContextMenu.tsx, RelationEditor.tsx, Palette.tsx, dragRules.ts
     graph/                  GraphView.tsx (read-only), deriveGraph.ts
     hud/                    panels.ts (state, persistence, insets), shortcuts.ts (the table),
                             useShortcuts.ts, Panel.tsx, TopBar.tsx, OfficePanel.tsx,
                             GraphOverlay.tsx, ShortcutHelp.tsx
     debugger/               ReplayController.ts, Timeline.tsx, PlaybackBar.tsx, TranscriptPanel.tsx, transcript.ts
-    inspector/              AgentInspector.tsx, DocumentInspector.tsx, EventInspector.tsx, ...
+    inspector/              AgentInspector.tsx, DocumentInspector.tsx, documentView.ts, EventInspector.tsx, ...
     state/                  workflowStore.ts, runStore.ts, replayStore.ts, uiStore.ts, actions.ts
 ```
 
@@ -904,7 +949,9 @@ workflow validation and v1 → v2 migration
 relation semantics: required order, optional routing, waits_for joins, maxRounds
 scheduler determinism with concurrency 1 (byte-for-byte log equality)
 termination: quiescence, deadlock, budgets
-document registry fold (server and web agree)
+document registry fold: server and web agree on the shared fixtures, after every event
+the world shows exactly the sheets the registry says are in sight, after every event
+logs written before a protocol addition still fold and replay
 replay reconstruction: worldStateAt is lane-independent
 event → visual action mapping, per verb and per event type
 transcript templates, per verb and per event type
@@ -918,6 +965,19 @@ Example:
 given MESSAGE_SENT anna → luca, same room
 expect MOVE_TO luca, TALK, SHOW_BUBBLE, HAND_DOCUMENT, RETURN_TO_POSITION
 ```
+
+Fixtures shared by both test suites live in `tests/fixtures/`, shaped like run
+exports so they also open in the UI (Runs → Open file):
+
+```text
+demo_run.json     the demo of §34 exactly as the runtime emits it; the server test fails
+                  if the runtime stops producing it, and the web tests run on it
+tables_run.json   a hand-written run with a pile and a shared table, until a runtime
+                  emits such events itself
+```
+
+Regenerate after an intended change with
+`UPDATE_FIXTURES=1 uv run pytest tests/test_fixtures.py` and review the diff.
 
 ---
 
@@ -990,7 +1050,7 @@ it, fork the run. Do not start it before replay and relations are stable.
 
 # 38. Development Order
 
-Phases 1–7 are done (§4). Each phase below ends with `npm test` green and
+Phases 1–8 are done (§4). Each phase below ends with `npm test` green and
 the demo of §34 passing. Do not start a phase before the previous one is
 merged.
 
@@ -1004,15 +1064,16 @@ mode switch BUILD | RUN | REPLAY in the top bar (BUILD still uses the graph edit
 only BUILD edits the workflow; a run on screen is read-only everywhere
 ```
 
-## Phase 8 — Documents
+## Phase 8 — Documents (done)
 
 ```text
-MESSAGE_SENT / RUN_STARTED carry documentId, version, content
+MESSAGE_SENT / RUN_STARTED / RUN_FINISHED carry documentId, version, title, content
 DOCUMENT_WRITTEN / DOCUMENT_READ / DOCUMENT_TAKEN event types
-tables in the workflow model (shared and pile), without any UI yet
+tables in the workflow model (shared and pile), without any UI to create them yet
 document registry: server (documents/registry.py) and web (protocol/documents.ts), tested equal
-world: DocumentSprite in hand, in-tray / out-tray; HAND_DOCUMENT action
-inspector: Document tab; transcript templates for documents
+world: sheets in a hand, in the in-tray and out-tray, on tables; all clickable
+inspector: the sheet, its versions and its history; Sheets tab on agents; sheet list in Office
+transcript sentences for documents and tables
 run export unchanged in shape, now self-describing for documents
 ```
 

@@ -1,10 +1,12 @@
 import { Application, Container, Graphics } from "pixi.js";
 import { AgentSprite } from "./AgentSprite";
 import { NO_INSETS, WorldCamera, type Insets } from "./Camera";
+import { DocumentSprite } from "./DocumentSprite";
+import { TableSprite, Tray } from "./Furniture";
 import { ROOM, type WorldLayout } from "./layout";
 import { SpeechBubble } from "./SpeechBubble";
 import { ToolStation } from "./ToolStation";
-import type { WorldState } from "./worldState";
+import { sheetPosition, type WorldState } from "./worldState";
 
 /** Where the renderer reads from each frame. In the app this is the ReplayController. */
 export interface WorldSource {
@@ -17,6 +19,7 @@ export interface WorldCallbacks {
   onAgentClick: (agentId: string) => void;
   onBubbleClick: (eventId: string) => void;
   onStationClick: (tool: string) => void;
+  onDocumentClick: (documentId: string) => void;
   /** A click on empty floor. */
   onFloorClick: () => void;
 }
@@ -25,6 +28,7 @@ export interface WorldCallbacks {
 export interface WorldSelection {
   agentId?: string;
   tool?: string;
+  documentId?: string;
 }
 
 function drawRoom(): Graphics {
@@ -51,7 +55,9 @@ export class PixelWorld {
   private app = new Application();
   private scene = new Container();
   private stationLayer = new Container();
+  /** Characters and floor furniture, drawn back to front. */
   private agentLayer = new Container({ sortableChildren: true });
+  private documentLayer = new Container();
   private bubbleLayer = new Container({ sortableChildren: true });
   private camera: WorldCamera | null = null;
 
@@ -59,6 +65,8 @@ export class PixelWorld {
   private agents = new Map<string, AgentSprite>();
   private bubbles = new Map<string, SpeechBubble>();
   private stations = new Map<string, ToolStation>();
+  /** Sheets come and go during a run, so their sprites are made and dropped as needed. */
+  private sheets = new Map<string, DocumentSprite>();
 
   private insets: Insets = NO_INSETS;
   private selection: WorldSelection = {};
@@ -89,7 +97,7 @@ export class PixelWorld {
       return;
     }
     this.host.appendChild(this.app.canvas);
-    this.scene.addChild(drawRoom(), this.stationLayer, this.agentLayer, this.bubbleLayer);
+    this.scene.addChild(drawRoom(), this.stationLayer, this.agentLayer, this.documentLayer, this.bubbleLayer);
     this.app.stage.addChild(this.scene);
     this.camera = new WorldCamera(this.app, this.scene, ROOM, this.callbacks.onFloorClick);
     this.camera.setInsets(this.insets);
@@ -135,16 +143,55 @@ export class PixelWorld {
       sprite.update(agent, clock, this.selection.agentId === agentId);
       this.bubbles.get(agentId)?.update(agent.speechBubble, agent.position.x, agent.position.y);
     }
+    this.drawSheets(state, layout);
   };
+
+  private drawSheets(state: WorldState, layout: WorldLayout): void {
+    const inSight = new Set<string>();
+    for (const sheet of Object.values(state.documents)) {
+      const at = sheetPosition(state, layout, sheet);
+      if (!at) continue; // the layout has nowhere to put it
+      inSight.add(sheet.documentId);
+      let sprite = this.sheets.get(sheet.documentId);
+      if (!sprite) {
+        sprite = new DocumentSprite(sheet.documentId, this.callbacks.onDocumentClick);
+        this.sheets.set(sheet.documentId, sprite);
+        this.documentLayer.addChild(sprite);
+      }
+      sprite.update(at, sheet.version, this.selection.documentId === sheet.documentId);
+    }
+    for (const [documentId, sprite] of this.sheets) {
+      if (inSight.has(documentId)) continue;
+      sprite.destroy({ children: true });
+      this.sheets.delete(documentId);
+    }
+  }
 
   private rebuild(layout: WorldLayout): void {
     this.layout = layout;
-    for (const layer of [this.stationLayer, this.agentLayer, this.bubbleLayer]) {
+    for (const layer of [this.stationLayer, this.agentLayer, this.documentLayer, this.bubbleLayer]) {
       layer.removeChildren().forEach((child) => child.destroy({ children: true }));
     }
     this.agents.clear();
     this.bubbles.clear();
     this.stations.clear();
+    this.sheets.clear();
+
+    for (const kind of ["in", "out"] as const) {
+      const at = layout.trays[kind];
+      if (!at) continue;
+      const tray = new Tray(kind);
+      tray.position.set(at.x, at.y);
+      tray.zIndex = at.y;
+      this.agentLayer.addChild(tray);
+    }
+    for (const table of layout.tables) {
+      const at = layout.tablePositions[table.id];
+      const sprite = new TableSprite(table);
+      sprite.position.set(at.x, at.y);
+      sprite.zIndex = at.y;
+      this.agentLayer.addChild(sprite);
+    }
 
     for (const tool of layout.tools) {
       const station = new ToolStation(tool, this.callbacks.onStationClick);

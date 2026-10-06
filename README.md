@@ -65,8 +65,10 @@ virtualenv in `apps/server/.venv`, whatever your shell exports.
 
 ```text
 workflows/     one JSON file per workflow (demo.json is the default one)
+tests/fixtures run logs both test suites read, so server and web cannot drift apart
 apps/server/server/
   events/      AgentEvent protocol, EventEmitter (stamps id / sequence / timestamp)
+  documents/   the sheets of a run, read back out of its event log
   runtime/     AgentRuntime interface, SimpleRuntime, the deterministic FakeModel
   workflow/    workflow schema, graph → execution plan, executor, demo workflow
   tools/       Tool interface and the mock tools (web_search, send_email, calculator)
@@ -74,7 +76,7 @@ apps/server/server/
   websocket/   live event fan-out
   main.py      FastAPI app
 apps/web/src/
-  protocol/    wire types (mirror of the server models)
+  protocol/    wire types (mirror of the server models) and the document fold
   animation/   VisualEventMapper (event → visual actions), AnimationController
   world/       PixiJS renderer, camera, world state, layout, placeholder sprites
   hud/         the shell: collapsible panels, top bar, shortcuts, graph overlay
@@ -96,6 +98,12 @@ apps/web/src/
   feed back into execution.
 - **Execution time ≠ visualization time.** The backend finishes at its own pace; the
   frontend buffers events and animates them at the chosen replay speed.
+- **What agents pass around is a sheet.** The task, every message and the result are
+  documents with an id and versions. They travel inside the events and nowhere else, so
+  a saved run contains every sheet and every version of it. In the world a sheet sits in
+  the in-tray, in someone's hands, on a table or in the out-tray, and can be clicked
+  like anything else; sheets an agent is done with are filed, out of sight but listed
+  under Sheets in the Office panel.
 - **Everything is saved.** Each workflow is a file, `workflows/<id>.json`: **Save** in the
   UI writes it, and a file you add or edit by hand shows up after a page reload. Each run stores a snapshot of the workflow it executed plus its full event
   log; every `AGENT_FINISHED` event carries that agent's context at hand-off. A run can be
@@ -120,13 +128,17 @@ default `0.3`; purely so live runs are watchable).
 
 ## Status
 
-Phases 1–7 of AGENTS.md §38 are in place: event protocol, fake runtime, pixel world,
-event → animation, replay, graph editor, and the world-first shell.
+Phases 1–8 of AGENTS.md §38 are in place: event protocol, fake runtime, pixel world,
+event → animation, replay, graph editor, the world-first shell, and documents.
 
 AGENTS.md revision 2 (2026-10-05) sets the direction: the pixel world is the primary
 GUI and becomes the editor, the graph a derived read-only view, and the workflow a list
 of relations ("Anna sends_to Luca") over agents, tools, documents, tables and rooms.
-Next up is Phase 8 (documents); see AGENTS.md §38 for the plan.
+Next up is Phase 9 (animation lanes); see AGENTS.md §38 for the plan.
+
+Tables (a shared board, a pile of sheets to work through) are in the protocol, the
+world and the inspector, but no runtime uses them until Phase 10. To see them, open
+`tests/fixtures/tables_run.json` with Runs → Open file.
 
 Until Phase 10 the runtime still executes a linear chain Start → agent → … → End;
 branching and loops are reported as a `RUN_ERROR`.

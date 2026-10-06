@@ -2,10 +2,17 @@ import { EVENT_COLOR } from "../debugger/Timeline";
 import { describeEvent, formatTime } from "../debugger/transcript";
 import type { AgentEvent } from "../protocol/events";
 import { replay } from "../state/replayStore";
+import { useUiStore } from "../state/uiStore";
 
 /** The raw technical record behind a dot, a bubble or a transcript line. */
 export function EventInspector({ event, names }: { event: AgentEvent; names: Record<string, string> }) {
   const full = typeof event.payload.content === "string" ? event.payload.content : undefined;
+  const select = useUiStore((state) => state.select);
+  // The sheets this event is about: the one it carries, or the ones it lists.
+  const { documentId, documentIds } = event.payload;
+  const sheets = [...(typeof documentId === "string" ? [documentId] : []), ...(Array.isArray(documentIds) ? documentIds : [])].filter(
+    (id): id is string => typeof id === "string" && id !== "",
+  );
   return (
     <div className="inspector">
       <h2>
@@ -37,6 +44,19 @@ export function EventInspector({ event, names }: { event: AgentEvent; names: Rec
           <div className="field">
             <dt>Full message</dt>
             <dd className="message">{full}</dd>
+          </div>
+        )}
+        {sheets.length > 0 && (
+          <div className="field">
+            <dt>{sheets.length === 1 ? "Sheet" : "Sheets"}</dt>
+            <dd className="sheet-links">
+              {[...new Set(sheets)].map((id) => (
+                <button key={id} onClick={() => select({ kind: "document", documentId: id })}>
+                  <span className="sheet-icon" />
+                  {id}
+                </button>
+              ))}
+            </dd>
           </div>
         )}
         <div className="field">
