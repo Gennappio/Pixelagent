@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef } from "react";
 import { replay, useReplay } from "../state/replayStore";
 import { useUiStore } from "../state/uiStore";
+import { eventStage } from "./ReplayController";
 import { buildTranscript } from "./transcript";
 
 /** The "verbale": a readable account of the run, one templated sentence per event. */
 export function Transcript({ names }: { names: Record<string, string> }) {
-  const { position, total } = useReplay();
+  const snapshot = useReplay();
+  const { position, total } = snapshot;
   const selection = useUiStore((state) => state.selection);
   const select = useUiStore((state) => state.select);
   const current = useRef<HTMLLIElement>(null);
@@ -24,9 +26,9 @@ export function Transcript({ names }: { names: Record<string, string> }) {
   return (
     <ol className="transcript">
       {lines.map((line, index) => {
+        const stage = eventStage(snapshot, index);
         const classes = [
-          index >= position ? "pending" : "",
-          index === position - 1 ? "current" : "",
+          stage === "done" ? "" : stage,
           line.isError ? "error" : "",
           selection?.kind === "event" && selection.eventId === line.eventId ? "selected" : "",
         ];

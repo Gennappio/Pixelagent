@@ -77,7 +77,7 @@ apps/server/server/
   main.py      FastAPI app
 apps/web/src/
   protocol/    wire types (mirror of the server models) and the document fold
-  animation/   VisualEventMapper (event → visual actions), AnimationController
+  animation/   VisualEventMapper (event → visual actions), lanes, AnimationScheduler
   world/       PixiJS renderer, camera, world state, layout, placeholder sprites
   hud/         the shell: collapsible panels, top bar, shortcuts, graph overlay
   debugger/    ReplayController, timeline, playback bar, transcript
@@ -98,6 +98,10 @@ apps/web/src/
   feed back into execution.
 - **Execution time ≠ visualization time.** The backend finishes at its own pace; the
   frontend buffers events and animates them at the chosen replay speed.
+- **Agents that do not depend on each other are shown at work together.** Every agent,
+  station, table and sheet is a lane; events on different lanes animate at the same time,
+  events on the same lane keep their order. Stepping is always one event at a time. Where
+  things end up never depends on this: it is the plain fold of the log.
 - **What agents pass around is a sheet.** The task, every message and the result are
   documents with an id and versions. They travel inside the events and nowhere else, so
   a saved run contains every sheet and every version of it. In the world a sheet sits in
@@ -128,17 +132,20 @@ default `0.3`; purely so live runs are watchable).
 
 ## Status
 
-Phases 1–8 of AGENTS.md §38 are in place: event protocol, fake runtime, pixel world,
-event → animation, replay, graph editor, the world-first shell, and documents.
+Phases 1–9 of AGENTS.md §38 are in place: event protocol, fake runtime, pixel world,
+event → animation, replay, graph editor, the world-first shell, documents, and
+animation lanes.
 
 AGENTS.md revision 2 (2026-10-05) sets the direction: the pixel world is the primary
 GUI and becomes the editor, the graph a derived read-only view, and the workflow a list
 of relations ("Anna sends_to Luca") over agents, tools, documents, tables and rooms.
-Next up is Phase 9 (animation lanes); see AGENTS.md §38 for the plan.
+Next up is Phase 10 (relations and the office runtime); see AGENTS.md §38 for the plan.
 
-Tables (a shared board, a pile of sheets to work through) are in the protocol, the
-world and the inspector, but no runtime uses them until Phase 10. To see them, open
-`tests/fixtures/tables_run.json` with Runs → Open file.
+Two things are built into the protocol and the world before any runtime produces them,
+and can be seen by opening a file with Runs → Open file:
+
+- `tests/fixtures/tables_run.json`: tables, with a shared board and a pile of sheets;
+- `tests/fixtures/parallel_run.json`: two agents working at the same time.
 
 Until Phase 10 the runtime still executes a linear chain Start → agent → … → End;
 branching and loops are reported as a `RUN_ERROR`.

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { AnimationController, worldStateAt } from "../animation/AnimationController";
+import { EventAnimation, worldStateAt } from "../animation/EventAnimation";
 import { mapEventToActions } from "../animation/VisualEventMapper";
 import { foldDocuments, latestVersion } from "../protocol/documents";
-import { demoEvents, demoWorkflow, tablesEvents, tablesWorkflow } from "../testing/demoRun";
+import { demoEvents, demoWorkflow, parallelEvents, parallelWorkflow, tablesEvents, tablesWorkflow } from "../testing/demoRun";
 import { buildLayout } from "./layout";
 import { actionDuration, applyAction, initialWorldState, SHEET_TRAVEL, sheetPosition, TABLE_DISTANCE } from "./worldState";
 
@@ -11,6 +11,7 @@ const officeLayout = buildLayout(tablesWorkflow);
 const RUNS = [
   ["the demo", demoEvents, demoLayout],
   ["the run with tables", tablesEvents, officeLayout],
+  ["the run with two agents at once", parallelEvents, buildLayout(parallelWorkflow)],
 ] as const;
 
 describe("the world and the document registry agree", () => {
@@ -23,7 +24,7 @@ describe("the world and the document registry agree", () => {
         .map((id) => registry.documents[id])
         .filter((record) => record.place.kind !== "filed")
         .map((record) => [record.id, record.place, latestVersion(record).version, latestVersion(record).title]);
-      const shown = Object.values(worldStateAt([...events], count, layout).documents).map((sheet) => [
+      const shown = Object.values(worldStateAt(events, count, layout).documents).map((sheet) => [
         sheet.documentId,
         sheet.place,
         sheet.version,
@@ -37,9 +38,9 @@ describe("the world and the document registry agree", () => {
 
   it.each(RUNS)("leaves no sheet in mid-air once an event of %s has settled", (_name, events, layout) => {
     for (let count = 0; count <= events.length; count++) {
-      for (const sheet of Object.values(worldStateAt([...events], count, layout).documents)) {
+      for (const sheet of Object.values(worldStateAt(events, count, layout).documents)) {
         expect(sheet.transit, `${sheet.documentId} after #${count}`).toBeUndefined();
-        expect(sheetPosition(worldStateAt([...events], count, layout), layout, sheet)).toBeDefined();
+        expect(sheetPosition(worldStateAt(events, count, layout), layout, sheet)).toBeDefined();
       }
     }
   });
@@ -68,13 +69,13 @@ describe("a sheet changing hands", () => {
   const actions = mapEventToActions(demoEvents[3]);
 
   it("takes visualization time, and passes through the air between the two", () => {
-    const controller = new AnimationController(before, actions, demoLayout);
+    const animation = new EventAnimation(before, actions, demoLayout);
     const seen = new Set<string>();
     let frames = 0;
-    while (!controller.done && frames < 10_000) {
-      controller.advance(16);
+    while (!animation.done && frames < 10_000) {
+      animation.advance(16);
       frames += 1;
-      const sheet = controller.state.documents.doc_1;
+      const sheet = animation.applyTo(before).documents.doc_1;
       if (!sheet) continue;
       seen.add(sheet.transit ? "in the air" : `${sheet.place.kind}:${"agentId" in sheet.place ? sheet.place.agentId : ""}`);
       if (sheet.transit) {
@@ -83,7 +84,7 @@ describe("a sheet changing hands", () => {
       }
     }
     expect([...seen]).toEqual(["hand:anna", "in the air", "hand:luca"]);
-    expect(controller.finalState.documents.doc_1.place).toEqual({ kind: "hand", agentId: "luca" });
+    expect(animation.applyTo(before).documents.doc_1.place).toEqual({ kind: "hand", agentId: "luca" });
   });
 
   it("travels with whoever holds it", () => {

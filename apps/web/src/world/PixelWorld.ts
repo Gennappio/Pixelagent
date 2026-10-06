@@ -13,7 +13,12 @@ export interface WorldSource {
   readonly worldState: WorldState;
   readonly worldLayout: WorldLayout;
   readonly clock: number;
+  /** Where the action is, when there is one place to look: a character's feet. */
+  readonly focus?: { key: string; position: { x: number; y: number } };
 }
+
+/** From a character's feet to the middle of its body, which is what should be in view. */
+const BODY_CENTRE = 24;
 
 export interface WorldCallbacks {
   onAgentClick: (agentId: string) => void;
@@ -130,6 +135,8 @@ export class PixelWorld {
   private frame = (): void => {
     const layout = this.source.worldLayout;
     if (layout !== this.layout) this.rebuild(layout);
+    const focus = this.source.focus;
+    this.camera?.follow(focus && { key: focus.key, position: { x: focus.position.x, y: focus.position.y - BODY_CENTRE } });
     this.camera?.update(this.app.ticker.deltaMS);
 
     const state = this.source.worldState;

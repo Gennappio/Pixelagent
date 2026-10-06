@@ -3,6 +3,7 @@ import type { AgentEvent, AgentEventType } from "../protocol/events";
 import { toolLabel } from "../protocol/workflow";
 import { replay, useReplay } from "../state/replayStore";
 import { useUiStore } from "../state/uiStore";
+import { eventStage } from "./ReplayController";
 
 const STEP = 30;
 const LANE = 30;
@@ -43,7 +44,8 @@ function linkedLane(event: AgentEvent): string | undefined {
 }
 
 export function Timeline() {
-  const { position } = useReplay();
+  const snapshot = useReplay();
+  const { position } = snapshot;
   const selection = useUiStore((state) => state.selection);
   const select = useUiStore((state) => state.select);
   const scroller = useRef<HTMLDivElement>(null);
@@ -104,10 +106,12 @@ export function Timeline() {
             const [fromY, toY] = INBOUND.has(event.type) ? [linkY, y] : [y, linkY];
             const color = EVENT_COLOR[event.type];
             const selected = selection?.kind === "event" && selection.eventId === event.id;
+            // Several events can be on show at once when agents work side by side.
+            const stage = eventStage(snapshot, index);
             return (
               <g
                 key={event.id}
-                className={`timeline-event${index >= position ? " pending" : ""}${index === position - 1 ? " current" : ""}`}
+                className={`timeline-event${stage === "done" ? "" : ` ${stage}`}`}
                 onClick={() => select({ kind: "event", eventId: event.id })}
                 onDoubleClick={() => replay.seek(event.sequence)}
               >

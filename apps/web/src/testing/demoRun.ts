@@ -1,4 +1,5 @@
 import demoRun from "../../../../tests/fixtures/demo_run.json";
+import parallelRun from "../../../../tests/fixtures/parallel_run.json";
 import tablesRun from "../../../../tests/fixtures/tables_run.json";
 import type { DocumentPlace, DocumentRegistry } from "../protocol/documents";
 import type { AgentEvent, AgentEventType } from "../protocol/events";
@@ -20,6 +21,12 @@ export const tablesWorkflow = tablesRun.run.workflow as unknown as Workflow;
 export const tablesEvents = tablesRun.events as unknown as AgentEvent[];
 export const tablesRegistry = tablesRun.registry as unknown as DocumentRegistry;
 export const tablesPlaces = tablesRun.places as unknown as Record<string, DocumentPlace>[];
+
+/** Two agents at work at once: their events alternate in the log. */
+export const parallelWorkflow = parallelRun.run.workflow as unknown as Workflow;
+export const parallelEvents = parallelRun.events as unknown as AgentEvent[];
+export const parallelRegistry = parallelRun.registry as unknown as DocumentRegistry;
+export const parallelPlaces = parallelRun.places as unknown as Record<string, DocumentPlace>[];
 
 export function eventOfType(type: AgentEventType, actorId?: string, events: AgentEvent[] = demoEvents): AgentEvent {
   const event = events.find((candidate) => candidate.type === type && (actorId === undefined || candidate.actorId === actorId));

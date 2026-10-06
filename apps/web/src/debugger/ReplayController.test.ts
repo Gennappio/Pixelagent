@@ -1,12 +1,22 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { worldStateAt } from "../animation/AnimationController";
-import { demoEvents, demoWorkflow } from "../testing/demoRun";
+import { worldStateAt } from "../animation/EventAnimation";
+import { demoEvents, demoWorkflow, parallelEvents, parallelWorkflow } from "../testing/demoRun";
 import { buildLayout } from "../world/layout";
 import { initialWorldState, STATION_DISTANCE } from "../world/worldState";
-import { adjacentSpeed, ReplayController, SPEEDS } from "./ReplayController";
+import { adjacentSpeed, eventStage, ReplayController, SPEEDS, type ReplaySnapshot } from "./ReplayController";
 
 const layout = buildLayout(demoWorkflow);
+const parallelLayout = buildLayout(parallelWorkflow);
 const FRAME = 16;
+
+/** Ticks until `ready` says so; fails rather than spin forever. */
+function tickUntil(controller: ReplayController, ready: (snapshot: ReplaySnapshot) => boolean, maxFrames = 100_000): void {
+  for (let frames = 0; frames < maxFrames; frames++) {
+    if (ready(controller.getSnapshot())) return;
+    controller.tick(FRAME);
+  }
+  throw new Error("the controller never got there");
+}
 
 /** Runs frames until the controller stops playing (or a frame budget runs out). */
 function runToStop(controller: ReplayController, maxFrames = 100_000): number {
@@ -179,3 +189,169 @@ describe("ReplayController", () => {
     });
   });
 });
+
+describe("eventStage", () => {
+  const base: ReplaySnapshot = { position: 0, total: 10, playing: false, speed: 1, streaming: false, active: [], finishedAhead: [] };
+
+  it("with nothing in motion, puts the last event applied on show", () => {
+    const stopped = { ...base, position: 4 };
+    expect([2, 3, 4, 5].map((index) => eventStage(stopped, index))).toEqual(["done", "current", "pending", "pending"]);
+    expect(eventStage(base, 0)).toBe("pending");
+  });
+
+  it("puts every event in flight on show, however many", () => {
+    const busy = { ...base, position: 4, active: [3, 5] };
+    expect([2, 3, 4, 5, 6].map((index) => eventStage(busy, index))).toEqual(["done", "current", "pending", "current", "pending"]);
+  });
+
+  it("does not call an event still to come when it has already been shown", () => {
+    const ahead = { ...base, position: 4, active: [3], finishedAhead: [5] };
+    expect([4, 5, 6].map((index) => eventStage(ahead, index))).toEqual(["pending", "done", "pending"]);
+  });
+});
+
+describe("ReplayController with agents working side by side", () => {
+  let controller: ReplayController;
+
+  beforeEach(() => {
+    controller = new ReplayController();
+    controller.load(parallelEvents, parallelLayout);
+  });
+
+  it("reports every event in flight, and keeps the playhead on the first unfinished one", () => {
+    controller.play();
+    tickUntil(controller, (snapshot) => snapshot.active.length >= 2);
+    const { position, active } = controller.getSnapshot();
+    expect(active[0]).toBe(position - 1);
+    expect(active.every((index) => index >= position - 1)).toBe(true);
+    expect(controller.currentEvent).toBe(parallelEvents[position - 1]);
+  });
+
+  it("plays to the end and lands on the plain fold of the log", () => {
+    controller.play();
+    runToStop(controller);
+    expect(controller.getSnapshot()).toMatchObject({ position: parallelEvents.length, playing: false, active: [], finishedAhead: [] });
+    expect(controller.worldState).toEqual(worldStateAt(parallelEvents, parallelEvents.length, parallelLayout));
+  });
+
+  it("freezes everything in flight while paused, and carries on from there", () => {
+    controller.play();
+    tickUntil(controller, (snapshot) => snapshot.active.length >= 2);
+    controller.pause();
+    const frozen = controller.worldState;
+    const { active, position } = controller.getSnapshot();
+    for (let i = 0; i < 100; i++) controller.tick(FRAME);
+    expect(controller.worldState).toEqual(frozen);
+    expect(controller.getSnapshot()).toMatchObject({ active, position, playing: false });
+
+    controller.play();
+    runToStop(controller);
+    expect(controller.worldState).toEqual(worldStateAt(parallelEvents, parallelEvents.length, parallelLayout));
+  });
+
+  it("goes back to one event at a time when stepping out of concurrent play", () => {
+    controller.play();
+    tickUntil(controller, (snapshot) => snapshot.active.length >= 2);
+    const playhead = controller.getSnapshot().position; // the event animating at the playhead
+
+    controller.next();
+    // That event is finished, what ran ahead is taken back, and the next one alone is animating.
+    expect(controller.getSnapshot()).toMatchObject({ position: playhead + 1, active: [playhead], finishedAhead: [], playing: true });
+    runToStop(controller);
+    expect(controller.getSnapshot()).toMatchObject({ position: playhead + 1, active: [], playing: false });
+    expect(controller.worldState).toEqual(worldStateAt(parallelEvents, playhead + 1, parallelLayout));
+  });
+
+  it("steps through the whole run showing exactly one more event each time", () => {
+    for (let count = 1; count <= parallelEvents.length; count++) {
+      controller.next();
+      expect(controller.getSnapshot().active.length).toBeLessThanOrEqual(1);
+      runToStop(controller);
+      expect(controller.getSnapshot().position).toBe(count);
+      expect(controller.worldState).toEqual(worldStateAt(parallelEvents, count, parallelLayout));
+    }
+    controller.next();
+    expect(controller.getSnapshot()).toMatchObject({ position: parallelEvents.length, playing: false });
+  });
+
+  it("previous() from concurrent play lands on the state before the event at the playhead", () => {
+    controller.play();
+    tickUntil(controller, (snapshot) => snapshot.active.length >= 2);
+    const playhead = controller.getSnapshot().position;
+    controller.previous();
+    expect(controller.getSnapshot()).toMatchObject({ position: playhead - 1, active: [], playing: false });
+    expect(controller.worldState).toEqual(worldStateAt(parallelEvents, playhead - 1, parallelLayout));
+  });
+
+  it("tells its listeners when something they can see changes, not on every frame", () => {
+    let notified = 0;
+    controller.subscribe(() => (notified += 1));
+    controller.play();
+    const frames = runToStop(controller);
+    expect(frames).toBeGreaterThan(1000);
+    // A handful per event (it starts, it ends, the playhead moves), nowhere near one per frame.
+    expect(notified).toBeGreaterThan(parallelEvents.length);
+    expect(notified).toBeLessThan(parallelEvents.length * 6);
+  });
+
+  it("replaces its snapshot exactly when it notifies, never silently and never for nothing", () => {
+    let notified = 0;
+    let replaced = 0;
+    controller.subscribe(() => (notified += 1));
+    controller.play();
+    let previous = controller.getSnapshot();
+    while (controller.getSnapshot().playing) {
+      controller.tick(FRAME);
+      const current = controller.getSnapshot();
+      if (current !== previous) {
+        replaced += 1;
+        expect(current).not.toEqual(previous);
+      }
+      previous = current;
+    }
+    // play() itself notified once before the loop began watching.
+    expect(replaced).toBe(notified - 1);
+    expect(replaced).toBeGreaterThan(parallelEvents.length);
+  });
+});
+
+describe("where the camera should look", () => {
+  let controller: ReplayController;
+
+  beforeEach(() => {
+    controller = new ReplayController();
+    controller.load(demoEvents, layout);
+  });
+
+  it("is nowhere in particular during continuous play", () => {
+    controller.play();
+    for (let i = 0; i < 300; i++) {
+      controller.tick(FRAME);
+      expect(controller.focus).toBeUndefined();
+    }
+  });
+
+  it("is the agent of the event being stepped, and moves with it", () => {
+    controller.seek(3);
+    controller.next(); // event 4: Anna walks over to Luca
+    const before = controller.focus!;
+    expect(before.key).toBe(demoEvents[3].id);
+    expect(before.position).toEqual(layout.homes.anna);
+    for (let i = 0; i < 20; i++) controller.tick(FRAME);
+    expect(controller.focus!.key).toBe(before.key);
+    expect(controller.focus!.position.x).toBeGreaterThan(before.position.x);
+  });
+
+  it("is the agent of the event at the playhead when stopped there", () => {
+    controller.seek(9); // Luca at the computer
+    expect(controller.focus).toEqual({ key: demoEvents[8].id, position: controller.worldState.agents.luca.position });
+    expect(controller.focus!.position).not.toEqual(layout.homes.luca);
+  });
+
+  it("is nowhere for an event that belongs to no agent, and before the run starts", () => {
+    expect(controller.focus).toBeUndefined();
+    controller.seek(1); // RUN_STARTED
+    expect(controller.focus).toBeUndefined();
+  });
+});
+

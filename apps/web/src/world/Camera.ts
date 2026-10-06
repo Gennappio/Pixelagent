@@ -10,6 +10,8 @@ const EASE_MS = 90;
 const CLICK_SLOP = 4;
 /** Below this the HUD leaves no usable space: frame against the whole viewport instead. */
 const MIN_FREE = 160;
+/** How close to the edge of the free area a followed point may get before the camera moves. */
+const FOCUS_MARGIN = 48;
 
 /** Viewport edges covered by HUD panels, in CSS pixels. */
 export interface Insets {
@@ -46,6 +48,28 @@ export function fitView(view: Size, world: Size, insets: Insets = NO_INSETS): Fr
   };
 }
 
+/**
+ * The framing that brings `point` (world coordinates) to the middle of the space the HUD
+ * leaves free, at the same zoom. Null when the point is already comfortably in view, so
+ * that following something never moves a camera that has no need to move.
+ */
+export function focusView(view: Size, insets: Insets, framing: Framing, point: { x: number; y: number }): Framing | null {
+  let { left, right, top, bottom } = insets;
+  if (view.width - left - right < MIN_FREE || view.height - top - bottom < MIN_FREE) left = right = top = bottom = 0;
+  const freeRight = view.width - right;
+  const freeBottom = view.height - bottom;
+  const marginX = Math.min(FOCUS_MARGIN, (freeRight - left) / 4);
+  const marginY = Math.min(FOCUS_MARGIN, (freeBottom - top) / 4);
+  const x = framing.x + point.x * framing.scale;
+  const y = framing.y + point.y * framing.scale;
+  if (x >= left + marginX && x <= freeRight - marginX && y >= top + marginY && y <= freeBottom - marginY) return null;
+  return {
+    scale: framing.scale,
+    x: Math.round((left + freeRight) / 2 - point.x * framing.scale),
+    y: Math.round((top + freeBottom) / 2 - point.y * framing.scale),
+  };
+}
+
 function sameInsets(a: Insets, b: Insets): boolean {
   return a.left === b.left && a.right === b.right && a.top === b.top && a.bottom === b.bottom;
 }
@@ -62,6 +86,9 @@ export class WorldCamera {
   /** Framing the camera is gliding towards, if any. */
   private goal: Framing | null = null;
   private framedOnce = false;
+  /** What is being followed, and whether the user has since looked elsewhere. */
+  private focusKey: string | null = null;
+  private following = false;
   private drag: { offsetX: number; offsetY: number; startX: number; startY: number; moved: boolean } | null = null;
 
   constructor(
@@ -107,6 +134,28 @@ export class WorldCamera {
     if (sameInsets(insets, this.insets)) return;
     this.insets = insets;
     if (!this.userAdjusted) this.frame();
+  }
+
+  /**
+   * Keeps a point of interest in view, call every frame. A new `key` means a new thing to
+   * look at; the camera then stays with it until the user pans or zooms, and leaves them
+   * alone until the key changes again. Only a camera the user has zoomed or panned needs
+   * this: one that frames the whole room already has everything in view.
+   */
+  follow(focus: { key: string; position: { x: number; y: number } } | undefined): void {
+    if (!focus) {
+      this.focusKey = null;
+      return;
+    }
+    if (focus.key !== this.focusKey) {
+      this.focusKey = focus.key;
+      this.following = true;
+    }
+    if (!this.following || !this.userAdjusted || this.viewWidth === 0) return;
+    // Judged against where the camera is heading, so a glide under way is not restarted.
+    const heading = this.goal ?? { scale: this.scene.scale.x, x: this.scene.x, y: this.scene.y };
+    const next = focusView({ width: this.viewWidth, height: this.viewHeight }, this.insets, heading, focus.position);
+    if (next) this.goal = next;
   }
 
   /** Call every frame with the real time elapsed since the previous one. */
@@ -157,6 +206,7 @@ export class WorldCamera {
   private takeControl(): void {
     this.userAdjusted = true;
     this.goal = null;
+    this.following = false;
   }
 
   private reset = (): void => {

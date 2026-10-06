@@ -151,12 +151,16 @@ Phase 8   documents: every message, the task and the result are sheets with an i
           server and on the web, held equal by shared fixtures; sheets, trays and
           tables in the world, clickable; sheet inspector; tables in the workflow
           model and the three table events, end to end
+Phase 9   animation lanes: events that touch different entities animate together,
+          with early release of lanes, a lookahead window, strict one-at-a-time
+          stepping, and a camera that follows the stepped event when zoomed in
 ```
 
-Not done: everything in §38 from Phase 9 on. Until Phase 10 the workflow is
+Not done: everything in §38 from Phase 10 on. Until then the workflow is
 still the revision 1 node graph, the graph overlay is still where agents are
-connected, and no runtime emits table events yet: tables are exercised by a
-hand-written log (`tests/fixtures/tables_run.json`).
+connected, and the runtime is sequential: it emits no table events and never
+has two agents at work at once. Tables and concurrency are exercised by
+hand-written logs (`tests/fixtures/tables_run.json`, `parallel_run.json`).
 
 The deterministic demo in §34 passes and must keep passing after every phase.
 
@@ -681,22 +685,40 @@ says are not filed, in the same places: a test holds the two folds together.
 
 # 21. Animation Lanes
 
-Revision 1 animates one event at a time. With several agents, rooms and
-instances that misrepresents concurrency. Replace it with lanes:
+Revision 1 animated one event at a time. With several agents, rooms and
+instances that misrepresents concurrency. Events are animated on lanes:
 
 ```text
 AnimationScheduler
-  one lane per agent instance, station, table and room device
-  an event claims the lanes of every entity its actions touch
-  an event starts when its lanes are free and every earlier event on those lanes is done
-  a lookahead window bounds how many events may be in flight (1 in step mode)
-  the playhead is the index of the first unfinished event
+  a lane per entity: agent, tool station, table, tray, document (later: instance, room device)
+  an event uses the lanes its actions touch (animation/lanes.ts)
+  it starts when no earlier unfinished event still holds a lane it needs
+  it gives a lane back after its last action that needs it, not when the whole event ends:
+    once Anna has handed Luca the sheet, Luca reacts while she walks home
+  a pause (WAIT) is shared: everyone the event has involved so far waits through it
+  the run starting, finishing or failing holds the whole office: nothing runs beside it
+  a lookahead window bounds how far past the playhead an event may start:
+    6 in continuous play, 1 while stepping, which is strict one-at-a-time
+  the playhead is the first unfinished event; events may be in flight, or already
+    finished, beyond it, and the timeline and the log mark every one that is on show
 ```
 
-Invariant: `worldStateAt(events, n)` stays a pure fold of the first `n`
-events, independent of lanes. Seeking settles `n` events and clears the
-in-flight set. Actions of concurrently in-flight events commute because their
-lanes are disjoint.
+Stepping shows exact prefixes of the log. Stepping out of concurrent play
+finishes the event at the playhead, takes back what had run ahead of it, and
+goes on one event at a time.
+
+Invariant: `worldStateAt(events, n)` is a pure fold of the first `n` events,
+independent of lanes. It holds by construction, not by the lanes being right:
+the settled prefix is folded with the same pure step a seek uses, and the
+world on show is that prefix with every started event laid over it in log
+order, the running ones only as far as they have got. Wrong lanes could make
+an animation look wrong while in flight; they cannot change where anything
+ends up. Seeking settles `n` events and clears the in-flight set.
+
+While stepping or stopped, the camera keeps the agent of the event at the
+playhead in view, if the user has zoomed in far enough for it to be out of
+sight, and stops following as soon as they pan or zoom. In continuous play
+several agents act at once and it stays where it is.
 
 Execution time and visualization time remain different things. A run may
 execute in four seconds and replay in forty-five.
@@ -713,6 +735,11 @@ Replay is deterministic from the event log. `ReplayController` keeps
 LIVE     WebSocket → ReplayController.append
 REPLAY   stored events → ReplayController.load
 ```
+
+`ReplayController` is the transport; which events animate together is the
+`AnimationScheduler`'s business (§21). Its snapshot carries the playhead and
+the events in flight, and is replaced only when one of those changes: the
+interface is not re-rendered on every frame.
 
 Long repetitive stretches (fifty takes from a pile) are compressed in the
 timeline into an expandable block. This is a timeline feature, not a
@@ -890,7 +917,8 @@ pixel-agents/
     websocket/              manager.py
   apps/web/src/
     protocol/               events.ts, workflow.ts, documents.ts
-    animation/              VisualEventMapper.ts, AnimationScheduler.ts, lanes.ts, visualActions.ts
+    animation/              VisualEventMapper.ts, visualActions.ts, lanes.ts, EventAnimation.ts,
+                            AnimationScheduler.ts
     world/                  PixelWorld.ts, AgentSprite.ts, DocumentSprite.ts, Furniture.ts (trays, tables),
                             Room.ts, Devices.ts, ToolStation.ts, SpeechBubble.ts, Camera.ts, layout.ts,
                             worldState.ts
@@ -952,7 +980,8 @@ termination: quiescence, deadlock, budgets
 document registry fold: server and web agree on the shared fixtures, after every event
 the world shows exactly the sheets the registry says are in sight, after every event
 logs written before a protocol addition still fold and replay
-replay reconstruction: worldStateAt is lane-independent
+replay reconstruction: worldStateAt is lane-independent, for every lookahead window
+lanes: an agent never does two things at once; unrelated agents do animate together
 event → visual action mapping, per verb and per event type
 transcript templates, per verb and per event type
 graph derivation from relations
@@ -974,6 +1003,8 @@ demo_run.json     the demo of §34 exactly as the runtime emits it; the server t
                   if the runtime stops producing it, and the web tests run on it
 tables_run.json   a hand-written run with a pile and a shared table, until a runtime
                   emits such events itself
+parallel_run.json a hand-written run where two agents work at once and their events
+                  alternate in the log: what the animation lanes are tested on
 ```
 
 Regenerate after an intended change with
@@ -1050,7 +1081,7 @@ it, fork the run. Do not start it before replay and relations are stable.
 
 # 38. Development Order
 
-Phases 1–8 are done (§4). Each phase below ends with `npm test` green and
+Phases 1–9 are done (§4). Each phase below ends with `npm test` green and
 the demo of §34 passing. Do not start a phase before the previous one is
 merged.
 
@@ -1077,13 +1108,15 @@ transcript sentences for documents and tables
 run export unchanged in shape, now self-describing for documents
 ```
 
-## Phase 9 — Animation lanes
+## Phase 9 — Animation lanes (done)
 
 ```text
 AnimationScheduler with per-entity lanes and a lookahead window
-step mode = lookahead 1; play mode = window of N
+step mode = lookahead 1; play mode = window of 6
+lanes given back action by action, so a recipient reacts while the sender walks home
 worldStateAt proven lane-independent by tests
-camera: focus on the entity of the current event in step mode
+camera: follows the agent of the stepped event when it is out of view
+timeline and log mark every event on show, not just one
 ```
 
 ## Phase 10 — Relations and the office runtime

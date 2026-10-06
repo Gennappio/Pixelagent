@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { demoEvents, demoPlaces, demoRegistry, tablesEvents, tablesPlaces, tablesRegistry } from "../testing/demoRun";
+import {
+  demoEvents,
+  demoPlaces,
+  demoRegistry,
+  parallelEvents,
+  parallelPlaces,
+  parallelRegistry,
+  tablesEvents,
+  tablesPlaces,
+  tablesRegistry,
+} from "../testing/demoRun";
 import { documentsTouchedBy, filedBy, foldDocuments, inHand, inTray, latestVersion, onTable, outTray, samePlace } from "./documents";
 import type { AgentEvent, AgentEventType } from "./events";
 
@@ -21,10 +31,15 @@ describe("the web fold reads a log exactly as the server does", () => {
     expect(foldDocuments(tablesEvents)).toStrictEqual(tablesRegistry);
   });
 
+  it("on a run where two agents work at once", () => {
+    expect(foldDocuments(parallelEvents)).toStrictEqual(parallelRegistry);
+  });
+
   it("after every single event of both runs, not only at the end", () => {
     for (const [events, places] of [
       [demoEvents, demoPlaces],
       [tablesEvents, tablesPlaces],
+      [parallelEvents, parallelPlaces],
     ] as const) {
       expect(places).toHaveLength(events.length);
       events.forEach((_, index) => {
@@ -36,7 +51,7 @@ describe("the web fold reads a log exactly as the server does", () => {
   });
 
   it("keeps its own books straight at every step", () => {
-    for (const events of [demoEvents, tablesEvents]) {
+    for (const events of [demoEvents, tablesEvents, parallelEvents]) {
       for (let count = 0; count <= events.length; count++) {
         const partial = foldDocuments(events.slice(0, count));
         expect(partial.order).toEqual(Object.keys(partial.documents));

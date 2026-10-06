@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitView, NO_INSETS } from "./Camera";
+import { fitView, focusView, NO_INSETS } from "./Camera";
 
 const room = { width: 640, height: 400 };
 
@@ -62,3 +62,53 @@ describe("fitView", () => {
     expect(fitView({ width: 0, height: 0 }, room).scale).toBeGreaterThan(0);
   });
 });
+
+describe("focusView", () => {
+  const view = { width: 1000, height: 600 };
+  // Zoomed in three times on the top-left corner of the room.
+  const zoomed = { scale: 3, x: 0, y: 0 };
+  const onScreen = (framing: { scale: number; x: number; y: number }, point: { x: number; y: number }) => ({
+    x: framing.x + point.x * framing.scale,
+    y: framing.y + point.y * framing.scale,
+  });
+
+  it("leaves the camera alone when the point is comfortably in view", () => {
+    expect(focusView(view, NO_INSETS, zoomed, { x: 150, y: 100 })).toBeNull();
+    expect(focusView(view, NO_INSETS, fitView(view, room), { x: 320, y: 280 })).toBeNull();
+  });
+
+  it("brings a point that is out of view to the middle, at the same zoom", () => {
+    const point = { x: 470, y: 280 }; // far off to the right and below
+    const moved = focusView(view, NO_INSETS, zoomed, point)!;
+    expect(moved.scale).toBe(3);
+    expect(onScreen(moved, point)).toEqual({ x: 500, y: 300 });
+  });
+
+  it("moves for a point that is in view but hard against the edge", () => {
+    const atTheEdge = { x: 5, y: 100 }; // 15 px from the left edge of the screen
+    expect(onScreen(zoomed, atTheEdge).x).toBe(15);
+    expect(focusView(view, NO_INSETS, zoomed, atTheEdge)).not.toBeNull();
+  });
+
+  it("counts a point hidden under a panel as out of view, and centres it beside the panels", () => {
+    const insets = { left: 266, right: 356, top: 0, bottom: 0 };
+    const underThePanel = { x: 60, y: 100 }; // on screen at x = 180, behind the left panel
+    expect(focusView(view, NO_INSETS, zoomed, underThePanel)).toBeNull();
+    const moved = focusView(view, insets, zoomed, underThePanel)!;
+    expect(onScreen(moved, underThePanel).x).toBe((266 + (1000 - 356)) / 2);
+  });
+
+  it("settles: the framing it returns needs no further move", () => {
+    const point = { x: 470, y: 280 };
+    const moved = focusView(view, NO_INSETS, zoomed, point)!;
+    expect(focusView(view, NO_INSETS, moved, point)).toBeNull();
+  });
+
+  it("ignores panels that leave no usable space, as framing does", () => {
+    const narrow = { width: 500, height: 600 };
+    const cramped = { left: 266, right: 356, top: 0, bottom: 0 };
+    const point = { x: 470, y: 280 };
+    expect(focusView(narrow, cramped, zoomed, point)).toEqual(focusView(narrow, NO_INSETS, zoomed, point));
+  });
+});
+

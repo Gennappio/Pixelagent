@@ -1,8 +1,8 @@
-import { AnimationController, worldStateAt } from "../animation/AnimationController";
-import { mapEventToActions } from "../animation/VisualEventMapper";
+import { AnimationScheduler, LOOKAHEAD } from "../animation/AnimationScheduler";
 import type { AgentEvent } from "../protocol/events";
+import type { Position } from "../protocol/workflow";
 import { EMPTY_LAYOUT, type WorldLayout } from "../world/layout";
-import { initialWorldState, type WorldState } from "../world/worldState";
+import type { WorldState } from "../world/worldState";
 
 export const SPEEDS = [0.25, 0.5, 1, 2, 4] as const;
 
@@ -14,31 +14,63 @@ export function adjacentSpeed(speed: number, direction: -1 | 1): number {
 }
 
 export interface ReplaySnapshot {
-  /** Number of events visualized so far, counting the one currently animating. */
+  /** The playhead: events visualized so far, counting the one animating there. */
   position: number;
   total: number;
   playing: boolean;
   speed: number;
   /** True while a live run may still append events. */
   streaming: boolean;
+  /**
+   * Indices (into the log) of the events animating right now. Several when agents that
+   * do not depend on each other are shown at work together; at most one while stepping.
+   */
+  active: readonly number[];
+  /** Indices past the playhead whose animation is already over. */
+  finishedAhead: readonly number[];
+}
+
+export type EventStage = "done" | "current" | "pending";
+
+/** How the event at `index` of the log stands: shown, on show right now, or still to come. */
+export function eventStage(snapshot: ReplaySnapshot, index: number): EventStage {
+  if (snapshot.active.includes(index)) return "current";
+  // With nothing in motion, the last event applied is the one on show.
+  if (snapshot.active.length === 0 && index === snapshot.position - 1) return "current";
+  return index < snapshot.position || snapshot.finishedAhead.includes(index) ? "done" : "pending";
+}
+
+function sameNumbers(a: readonly number[], b: readonly number[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+function sameSnapshot(a: ReplaySnapshot, b: ReplaySnapshot): boolean {
+  return (
+    a.position === b.position &&
+    a.total === b.total &&
+    a.playing === b.playing &&
+    a.speed === b.speed &&
+    a.streaming === b.streaming &&
+    sameNumbers(a.active, b.active) &&
+    sameNumbers(a.finishedAhead, b.finishedAhead)
+  );
 }
 
 /**
  * The one event consumer behind the pixel world, for live runs and replays alike:
  * live mode appends events as they arrive, replay loads them from storage.
  *
- * Incoming events are buffered in `events`; the cursor walks them at the pace of
+ * Incoming events are buffered in `events`; the scheduler walks them at the pace of
  * the animations, so the backend can run arbitrarily faster than the visualization.
+ * This class is the transport (play, pause, step, seek, speed); which events animate
+ * together is the scheduler's business.
  */
 export class ReplayController {
   private events: AgentEvent[] = [];
   private layout: WorldLayout = EMPTY_LAYOUT;
-  /** Events fully visualized. `base` is the world after exactly these. */
-  private cursor = 0;
-  private base: WorldState = initialWorldState(EMPTY_LAYOUT);
-  /** Animation of events[cursor], when one is in flight. */
-  private animation: AnimationController | null = null;
+  private scheduler = new AnimationScheduler();
   private playing = false;
+  /** Animating a single event on request, then stopping. */
   private stepping = false;
   private speed = 1;
   private streaming = false;
@@ -54,7 +86,9 @@ export class ReplayController {
     this.streaming = options.streaming ?? false;
     this.playing = false;
     this.stepping = false;
-    this.jumpTo(0);
+    // The scheduler reads this very array, so events appended later reach it too.
+    this.scheduler.load(this.events, layout);
+    this.changed();
   }
 
   /** Live mode: buffer an event that just arrived. */
@@ -71,7 +105,7 @@ export class ReplayController {
   }
 
   play(): void {
-    if (this.atEnd && !this.streaming) this.jumpTo(0);
+    if (this.atEnd && !this.streaming) this.scheduler.jumpTo(0);
     this.playing = true;
     this.stepping = false;
     this.changed();
@@ -83,12 +117,16 @@ export class ReplayController {
     this.changed();
   }
 
-  /** Completes the event in flight (if any) and animates the following one, then stops. */
+  /**
+   * Completes the event at the playhead (if one is animating) and animates the following
+   * one, then stops. Stepping shows exact prefixes of the log, one event at a time: anything
+   * that had run ahead of the playhead during play is taken back and will be stepped through.
+   */
   next(): void {
-    if (this.animation) this.completeAnimation();
-    this.stepping = this.cursor < this.events.length;
+    this.scheduler.settleFront();
+    this.stepping = this.scheduler.settled < this.events.length;
     this.playing = this.stepping;
-    if (this.stepping) this.startAnimation();
+    if (this.stepping) this.scheduler.launch(1);
     this.changed();
   }
 
@@ -96,13 +134,15 @@ export class ReplayController {
   previous(): void {
     this.playing = false;
     this.stepping = false;
-    this.jumpTo(this.animation ? this.cursor : this.cursor - 1);
+    this.scheduler.jumpTo(this.scheduler.busy ? this.scheduler.settled : this.scheduler.settled - 1);
+    this.changed();
   }
 
   /** Jumps to the state right after the event with this sequence number (0 = start). */
   seek(sequence: number): void {
     this.stepping = false;
-    this.jumpTo(this.events.filter((event) => event.sequence <= sequence).length);
+    this.scheduler.jumpTo(this.events.filter((event) => event.sequence <= sequence).length);
+    this.changed();
   }
 
   setSpeed(speed: number): void {
@@ -115,28 +155,22 @@ export class ReplayController {
     if (!this.playing) return;
     const ms = elapsedMs * this.speed;
     this.clockMs += ms;
-    if (!this.animation) {
-      if (this.cursor >= this.events.length) {
-        // Caught up: wait for more live events, or stop at the end of a replay.
-        if (!this.streaming) this.pause();
-        return;
-      }
-      this.startAnimation();
-      this.changed();
+    if (this.atEnd) {
+      // Caught up: wait for more live events, or stop at the end of a replay.
+      if (!this.streaming) this.pause();
+      return;
     }
-    if (this.animation!.advance(ms)) {
-      this.completeAnimation();
-      if (this.stepping) {
-        this.stepping = false;
-        this.playing = false;
-      }
-      this.changed();
+    this.scheduler.advance(ms, this.stepping ? 1 : LOOKAHEAD);
+    if (this.stepping && !this.scheduler.busy) {
+      this.stepping = false;
+      this.playing = false;
     }
+    this.changed();
   }
 
   /** What the pixel world should draw right now. */
   get worldState(): WorldState {
-    return this.animation ? this.animation.state : this.base;
+    return this.scheduler.state;
   }
 
   get worldLayout(): WorldLayout {
@@ -152,9 +186,21 @@ export class ReplayController {
     return this.events;
   }
 
-  /** The event currently shown: the one animating, else the last one applied. */
+  /** The event at the playhead: the one animating there, else the last one applied. */
   get currentEvent(): AgentEvent | undefined {
     return this.events[this.snapshot.position - 1];
+  }
+
+  /**
+   * Where the action is, for a camera that should keep it in view: the agent of the event
+   * at the playhead. Only while stepping or stopped. During continuous play several agents
+   * act at once and there is no single place to look.
+   */
+  get focus(): { key: string; position: Position } | undefined {
+    if (this.playing && !this.stepping) return undefined;
+    const event = this.currentEvent;
+    const agent = event?.actorId ? this.worldState.agents[event.actorId] : undefined;
+    return event && agent ? { key: event.id, position: agent.position } : undefined;
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -165,39 +211,28 @@ export class ReplayController {
   getSnapshot = (): ReplaySnapshot => this.snapshot;
 
   private get atEnd(): boolean {
-    return !this.animation && this.cursor >= this.events.length;
-  }
-
-  private startAnimation(): void {
-    this.animation = new AnimationController(this.base, mapEventToActions(this.events[this.cursor]), this.layout);
-  }
-
-  private completeAnimation(): void {
-    this.base = this.animation!.finalState;
-    this.animation = null;
-    this.cursor += 1;
-  }
-
-  private jumpTo(count: number): void {
-    this.cursor = Math.max(0, Math.min(count, this.events.length));
-    this.animation = null;
-    // Visual state is disposable: rebuild it from the event log.
-    this.base = worldStateAt(this.events, this.cursor, this.layout);
-    this.changed();
+    return !this.scheduler.busy && this.scheduler.settled >= this.events.length;
   }
 
   private buildSnapshot(): ReplaySnapshot {
+    const active = this.scheduler.active;
     return {
-      position: this.cursor + (this.animation ? 1 : 0),
+      // An event at the playhead that has started counts as visualized, as it always has.
+      position: this.scheduler.settled + (this.scheduler.busy ? 1 : 0),
       total: this.events.length,
       playing: this.playing,
       speed: this.speed,
       streaming: this.streaming,
+      active,
+      finishedAhead: this.scheduler.finishedAhead,
     };
   }
 
+  /** Publishes a new snapshot, but only when something a listener can see has changed. */
   private changed(): void {
-    this.snapshot = this.buildSnapshot();
+    const next = this.buildSnapshot();
+    if (sameSnapshot(next, this.snapshot)) return;
+    this.snapshot = next;
     this.listeners.forEach((listener) => listener());
   }
 }
