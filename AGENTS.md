@@ -1,14 +1,19 @@
 # AGENTS.md
 
-Revision 2, 2026-10-05. Revision 1 specified and built the MVP vertical slice
-(graph editor, fake runtime, pixel world, replay). This revision changes the
-construction surface and extends the model:
+Revision 3, 2026-10-06. Revision 1 specified and built the MVP vertical slice
+(graph editor, fake runtime, pixel world, replay). Revision 2 made the pixel
+world the primary GUI and the editor, the node graph a derived read-only view,
+and the workflow a list of relations over documents, tables, rooms and
+instances; its phases 7–10 are built. This revision follows the first hands-on
+use of that build. It adds no primitive; it fixes what a character is, what a
+hand-off carries, and how the office is built and shown:
 
 ```text
-the pixel world is the primary GUI and the editor
-the node graph is a derived, read-only view
-four new primitives: documents, tables, rooms, instances
-the workflow is a list of relations, not a node graph
+a character is one task with three slots: what arrives, what it consults, where its sheet goes
+there are no steps inside a character: a sequence is a chain of characters
+a hand-off is a spoken message plus at most one sheet; the sheet is the context, the message the instruction
+the office is built on the characters themselves: a menu on the character, targets picked in the world
+the interface is a game's: an icon bar, pixel-art windows that close, a camera that zooms
 ```
 
 The core rule of revision 1 is unchanged and non-negotiable:
@@ -84,7 +89,8 @@ The world is where the user builds the workflow and where they watch it run.
 The graph is derived from the same workflow JSON and cannot be edited.
 
 Clicking any character, sheet, station, speech bubble, timeline dot or
-transcript line opens the underlying technical information.
+transcript line opens the underlying technical information. While building,
+clicking a character opens the menu that says what it does (§24).
 
 ---
 
@@ -154,13 +160,20 @@ Phase 8   documents: every message, the task and the result are sheets with an i
 Phase 9   animation lanes: events that touch different entities animate together,
           with early release of lanes, a lookahead window, strict one-at-a-time
           stepping, and a camera that follows the stepped event when zoomed in
+Phase 10  relations and the office runtime: a workflow is a list of sentences
+          (schema version 2, revision 1 files read as they are); a runtime that
+          executes all eight verbs, with joins, cycles, tables, rule agents,
+          several agents at once, budgets and a stop; the sentence editor in the
+          agent inspector; the graph derived from relations, read-only
 ```
 
-Not done: everything in §38 from Phase 10 on. Until then the workflow is
-still the revision 1 node graph, the graph overlay is still where agents are
-connected, and the runtime is sequential: it emits no table events and never
-has two agents at work at once. Tables and concurrency are exercised by
-hand-written logs (`tests/fixtures/tables_run.json`, `parallel_run.json`).
+Not done: everything in §38 from Phase 11 on. Revision 3 rewrote the plan from
+there: Phases 11–14 are the changes this revision makes (the three slots and
+the spoken message, the camera, building on the characters, the game
+interface), and the phases of revision 2 follow them, renumbered. Today a
+workflow is built by adding agents and tables in the Office panel and saying
+what each agent does in its inspector, a hand-off carries a sheet and nothing
+else, and the panels are the plain ones of Phase 7.
 
 The deterministic demo in §34 passes and must keep passing after every phase.
 
@@ -226,8 +239,19 @@ Rules:
 - Tool stations are not authored: the layout places one station per tool per
   room in which some agent `uses_tool` it. Layout keys: `<agentId>`,
   `table:<tableId>`, `station:<tool>@<roomId>`, `room:<roomId>`.
-- A workflow has at least one room. Revision 1 files (`nodes` / `edges`) are
-  migrated on load by `workflow/migrate.py` and saved back as version 2.
+- A workflow has at least one room, and for now exactly one is used.
+- On the wire a relation says only what is not the default: `required` appears
+  only when it differs from the verb's default (§7), `hint` only when not empty.
+- A workflow may be unfinished and is still saved: no entry yet, an agent
+  nobody hands anything to. What a run needs on top of that (an entry, an
+  exit, tools and providers the server knows) is checked when a run starts,
+  and a workflow that cannot run produces RUN_STARTED followed by RUN_ERROR.
+- Revision 1 workflows (`nodes` / `edges`) are read as revision 2 wherever they
+  turn up: files, the snapshot stored with an old run, request bodies
+  (`workflow/migrate.py`), and files the browser opens without the server
+  (`web/src/protocol/migrate.ts`). A file is rewritten only when it is saved,
+  never by being read. `tests/fixtures/workflow_v1.json` holds workflows both
+  functions must upgrade identically.
 
 ---
 
@@ -239,16 +263,49 @@ verb has exactly three definitions that must stay aligned: execution semantics
 in the runtime, a rule in the VisualEventMapper, and a sentence template in
 the transcript. A verb missing one of the three does not exist.
 
+A character is one task with three slots, and every verb belongs to one of
+them. This is how sentences are shown, edited and reasoned about:
+
+```text
+arrives     what starts a turn, or lies on the desk when it starts
+            is_entry · waits_for · takes_from_table · and, derived, every sends_to another
+            agent points at this one (listed here, edited on the sender)
+consults    what the agent gathers, or may gather, while it works
+            reads_table · uses_tool
+goes out    where its sheet and its words go when the turn ends
+            sends_to · writes_table · is_exit
+```
+
+The runtime fills the slots; the model does the task in between. What arrives
+starts the turn and is read in arrival order. What is consulted never starts a
+turn: a required consult is fetched by the runtime before the model thinks, an
+optional one is the model's to call. What goes out is one sheet at most, with
+a message for each recipient (§9).
+
 | verb | subject → object | UI label (it) | execution semantics | in the world |
 |---|---|---|---|---|
-| `sends_to` | agent → agent | consegna messaggio a | At the end of its turn the subject hands its output document to the object. `required`: always. Optional: the model may choose it (DECISION, kind `routing`). Across rooms it goes by phone/fax. | walk to the object, talk, hand the sheet |
-| `waits_for` | agent → agent | aspetta messaggio da | The subject's turn starts only once a message from every `waits_for` source has arrived (join). Earlier messages are buffered. | idle at desk with status `waiting` |
-| `uses_tool` | agent → tool | ha a disposizione | The tool is available inside the subject's turn loop. | walk to the station, work |
+| `sends_to` | agent → agent | consegna a | At the end of its turn the subject says something to the object and hands over its sheet, if it has one. `required` (default): always. Optional: the model may choose it (DECISION, kind `routing`). Across rooms it goes by phone/fax. | walk to the object, talk, hand over the sheet if there is one |
+| `waits_for` | agent → agent | aspetta da | The subject's turn starts only once a hand-off from every `waits_for` source has arrived (join). Earlier hand-offs are buffered. | idle at desk with status `waiting` |
+| `uses_tool` | agent → tool | può usare / consulta prima | Optional (default): the tool is available inside the subject's turn loop and the model chooses to call it (DECISION, kind `tool_selection`). `required`: the runtime calls it once at turn start with the turn's input as its one argument, no DECISION; allowed only for a tool whose schema has exactly one required string parameter. | walk to the station, work |
 | `reads_table` | agent → table | legge dal tavolo | At turn start the table's current documents are added to the context. Shared mode. | walk to the table, read |
-| `writes_table` | agent → table | scrive sul tavolo | The subject may write a document to the table. Shared mode: same title = new version of the same document. Pile mode: every write is a new document. `required` / optional like `sends_to`. | walk to the table, place a sheet |
+| `writes_table` | agent → table | scrive sul tavolo | The subject's sheet is placed on the table. Shared mode: same title = new version of the same document. Pile mode: every write is a new document. `required` / optional like `sends_to`. | walk to the table, place a sheet |
 | `takes_from_table` | agent → table | prende dal tavolo | Pile mode only. While the pile is not empty the subject is triggered; each turn consumes one document. | walk to the pile, take a sheet |
-| `is_entry` | agent | è l'ingresso | Receives the run input as its first document. | in-tray at the desk |
-| `is_exit` | agent | è l'uscita | Its last output is the run output. | out-tray at the desk |
+| `is_entry` | agent | è l'ingresso | Receives the run input as its first sheet. | in-tray at the desk |
+| `is_exit` | agent | è l'uscita | The last sheet it writes is the run output. | out-tray at the desk |
+
+The interface is in English for now, and shows each verb with the phrase the
+server also uses when it puts a relation into words (`workflow/relations.py`
+and `web/src/protocol/relations.ts`, word for word): hands to, waits for, can
+use (optional) and consults first (required), reads, writes on, takes from,
+is the entry, is the exit. The Italian labels above are the vocabulary the
+product was imagined in, kept for a translation.
+
+Only one agent is the entry and only one the exit: giving that to an agent
+takes it from whoever had it. `takes_from_table` needs a pile and
+`reads_table` a shared table. A required `uses_tool` needs a tool with one
+string argument: the editor offers "consults first" only for those, and a run
+of a workflow that says otherwise fails with `WorkflowError`. The same
+sentence cannot be said twice.
 
 Relation fields:
 
@@ -257,13 +314,21 @@ id         stable
 subject    agent id
 verb       one of the catalog
 object     agent id | tool name | table id   (absent for unary verbs)
-required   boolean, default true. Only meaningful for sends_to and writes_table.
-order      integer. Required sends_to / writes_table of one subject fire in this order.
+required   boolean. Default true for sends_to and writes_table, false for uses_tool;
+           meaningless on the other verbs. True: the runtime does it. False: the model
+           chooses, turn by turn.
+order      integer: the position of the sentence among its subject's. Required outputs
+           fire in this order; consults enter the context in this order.
 maxRounds  integer. Max firings of this relation per run. When exceeded the relation
            becomes unavailable for the rest of the run and a DECISION (kind "budget")
            says so. Default 5 when the relation closes a cycle, unlimited otherwise.
 hint       free text shown to the model: when this relation should be chosen.
 ```
+
+How much a character should carry: a few things that arrive, a few it
+consults, and by default one way out. A choice among several optional ways
+out is the only place where the model touches the graph. If describing a
+character takes two sentences joined by "then", it is two characters.
 
 Later verbs, not now: `asks_approval_from` (human in the loop),
 `calls_subworkflow`.
@@ -277,8 +342,9 @@ with a natural visual. Anything that fits none of them goes into code inside a
 tool.
 
 ```text
-Layer 1  inside the agent      the turn loop: think, call a tool, observe, repeat.
-                               Ten web searches are ten TOOL_CALL events, not a loop node.
+Layer 1  inside the agent      the turn: the consults are fetched, then think, call a tool,
+                               observe, repeat. Ten web searches are ten TOOL_CALL events,
+                               not a loop node.
 
 Layer 2  between agents        optional relations + DECISION (model routing)
                                rule agents without an LLM (deterministic routing)
@@ -289,9 +355,14 @@ Layer 3  at scale              tables in pile mode + agent instances ("Luca ×3"
                                collector (a pile → one summary, on quiescence)
 ```
 
-Ordered required relations give one agent a short routine ("first hand to
-Luca, then wait for Luca, then hand to Gianni"). A routine longer than five
-or six steps is a sign the agent should be split.
+There are no steps inside a character. Revision 2 let ordered required
+relations give one agent a routine ("first hand to Luca, then wait for Luca,
+then hand to Gianni"); that was a workflow hiding in a graph, and it is gone.
+A sequence is a chain of characters, each one task, and `order` only settles
+in what order a fan-out fires and consults enter the context. A manager who
+delegates and then forwards is one character with two optional ways out: each
+turn it sees whom the hand-off came from and chooses. Nothing in a character
+remembers an earlier turn; what must be remembered is on a sheet.
 
 The MVP demo is the special case: all relations required, one instance per
 agent, no tables.
@@ -319,8 +390,35 @@ a table write is an event. Both the runtime (for tables) and the frontend
 log. Saving a run saves every document and every version, which satisfies the
 requirement that pipeline and context states be savable.
 
-The run input is document `doc_input`, handed to the entry agent. The exit
-agent's last output is the run output document.
+The run input is document `doc_input`, handed to the entry agent. The run
+output is the last sheet the exit agent wrote; if it never wrote one, the run
+ends with `NoResult`.
+
+A sheet is what an agent writes; a message is what it says. They are
+different things and the log keeps them apart:
+
+```text
+message   short, spoken, one per recipient, per turn. The instruction: "find the sales
+          number", "here is the research, send it on", "go ahead".
+          Lives only in the MESSAGE_SENT event. Not a document: no id, no versions.
+          Shown in the speech bubble, read back in the transcript.
+sheet     what the agent wrote, or passes on: the content, the context for whoever gets
+          it. Has an id and versions, lives in the registry, is a paper in the world.
+```
+
+A hand-off is a message plus at most one sheet. A message alone is allowed:
+the character walks over and talks, no paper. A sheet alone is what a log
+from before this revision contains. What the receiver gets as context is the
+message, then the sheet. A table receives sheets only.
+
+Each turn an agent produces at most one sheet, and it is one of three things:
+a new sheet; a new version of a sheet it holds, when it writes under that
+sheet's title; or a sheet it holds, passed on as it is. Same title, same
+document: the rule of shared tables holds in hands too. A sheet handed to
+several recipients in one turn is photocopied: the first gets the sheet, each
+other one a new document with the same title and content and `copyOf`
+pointing at it. Nothing else is handed on: what the agent received and did
+not pass on is filed when its turn ends.
 
 A document is always in exactly one place:
 
@@ -369,7 +467,7 @@ room.
 Cross-room interaction uses the same relations and events:
 
 ```text
-sends_to across rooms          phone (message)  or  fax (message with a large document)
+sends_to across rooms          phone (words only)  or  fax (words with a sheet)
 global table                   intranet totem in every room
 ```
 
@@ -390,11 +488,17 @@ builtin deterministic behaviour and participates in relations and events like
 any agent. Its sprite is a machine.
 
 ```text
-rule / splitter    takes one document holding a list, writes one document per item to a pile
-rule / collector   takes from a pile; when the pile is empty and every taker is idle,
-                   writes one summary document and hands it on
-rule / router      hands its input to the first sends_to whose condition matches
+rule / splitter    writes one sheet per line of what it is given, on each table it writes on
+rule / collector   takes nothing while anyone else can work; when the office has gone
+                   quiet it takes its whole pile at once and passes it on as one sheet
+rule / router      hands the sheet on unchanged along one of its optional sends_to: the
+                   first of `model.rules` ({contains, to}) whose text the sheet contains,
+                   else `model.otherwise`, else the first it can hand to
 ```
+
+Which rule an agent follows is `model.name`. The collector is how a pile is
+gathered back into one sheet without a counter: it does not need to know how
+many sheets there will be, only that nobody is producing any more.
 
 The `fake` provider of revision 1 is a scripted rule agent and stays as the
 engine of the deterministic demo.
@@ -421,9 +525,9 @@ Providers:
 ```text
 fake         scripted, deterministic (demo and tests)
 rule         builtin behaviours: splitter, collector, router
-anthropic    first real LLM provider (Phase 12). Load the claude-api skill when implementing.
-claude_code  runtime adapter: the agent is a Claude Code session (Phase 16)
-pi           runtime adapter: the agent is a Pi session (Phase 16)
+anthropic    first real LLM provider (Phase 15). Load the claude-api skill when implementing.
+claude_code  runtime adapter: the agent is a Claude Code session (Phase 19)
+pi           runtime adapter: the agent is a Pi session (Phase 19)
 ```
 
 ---
@@ -471,12 +575,15 @@ Payload conventions:
 
 ```text
 RUN_STARTED        workflowId, workflowName, input, documentId: "doc_input", version, title
-AGENT_STARTED      input, role, model, documentIds[]: the sheets the turn starts from
-MESSAGE_SENT       documentId, version, title, content, summary?
+AGENT_STARTED      input: what arrived, as text (each message, then its sheet, in arrival
+                   order); role, model, documentIds[]: the sheets the turn starts from
+MESSAGE_SENT       message: what is said, may be empty; then, when a sheet goes with it,
+                   documentId, version, title, content, summary?, copyOf? (§9)
 MESSAGE_RECEIVED   same as MESSAGE_SENT
 DECISION           kind: "tool_selection" | "routing" | "handoff" | "budget", summary,
                    relationId? (routing), tool? (tool_selection)
-TOOL_CALL          tool, arguments
+TOOL_CALL          tool, arguments, required?: true when the runtime called it at turn start
+                   for a required uses_tool (no DECISION precedes it)
 TOOL_RESULT        tool, result, summary, metrics { latencyMs }
 DOCUMENT_WRITTEN   tableId, documentId, version, title, content, summary?
 DOCUMENT_READ      tableId, documentIds[]
@@ -489,7 +596,10 @@ RUN_ERROR          message, errorType ("BudgetExceeded", "Deadlock", "ToolError"
 A document's content is the event's `content`, except for the task
 (`RUN_STARTED.input`) and the result (`RUN_FINISHED.output`). Every document
 field is optional to a reader: a log written before documents existed has
-none, folds to no documents, and still replays.
+none, folds to no documents, and still replays. `message` is optional the
+same way: a MESSAGE_SENT without it, from before revision 3, shows the sheet's
+summary in the bubble and the transcript; one without a sheet is a spoken
+message and nothing else, and leaves the registry as it was.
 
 `DECISION` is an explicit, intentionally emitted rationale or routing choice.
 Hidden chain-of-thought is never an observable artifact.
@@ -498,14 +608,36 @@ Hidden chain-of-thought is never an observable artifact.
 
 # 14. Example Events
 
-A hand-off, with its document inline:
+A hand-off: what Anna says, and the sheet she passes on, inline:
 
 ```json
 {
   "id": "evt_0023", "runId": "run_001", "sequence": 23,
   "timestamp": "2026-10-05T14:31:02.432Z",
   "type": "MESSAGE_SENT", "actorId": "anna", "targetId": "luca",
-  "payload": { "documentId": "doc_2", "version": 1, "content": "Find the latest sales number." }
+  "payload": {
+    "message": "Find the latest sales number.",
+    "documentId": "doc_input", "version": 1, "title": "Task",
+    "content": "Find the latest sales number and send it to management."
+  }
+}
+```
+
+A hand-off with nothing but words:
+
+```json
+{
+  "type": "MESSAGE_SENT", "actorId": "anna", "targetId": "luca",
+  "payload": { "message": "Go ahead with the draft." }
+}
+```
+
+A tool consulted by the runtime, not chosen by the model:
+
+```json
+{
+  "type": "TOOL_CALL", "actorId": "luca",
+  "payload": { "tool": "mcp:library/search", "arguments": { "query": "Find the latest sales number." }, "required": true }
 }
 ```
 
@@ -545,29 +677,41 @@ relations.
 
 ```text
 Scheduler
-  every agent instance has a mailbox
-  a trigger is: the run input (entry agent), a message, a document available in a
-    pile the agent takes_from, a satisfied waits_for join
-  the ready set is the idle instances that have a trigger
-  instances are picked in a stable order: relation declaration order, then instance number
-  up to `concurrency` turns run at once. concurrency = 1 for tests and the demo:
-    with deterministic providers the log is then byte-for-byte reproducible.
-  events from concurrent turns are serialized by the emitter, which assigns `sequence`
+  every agent has an in-tray of hand-offs (a message, with or without a sheet) not yet
+    worked on
+  a trigger is: the task (entry agent), a hand-off in the in-tray, a sheet on a pile the
+    agent takes_from, or, for an agent that waits_for others, a hand-off from each of them
+  an agent has one turn at a time; the oldest trigger in the office goes first, and
+    among equals the agent whose relations come first
+  what a turn hands on reaches the others when the turn ends: that is the only moment
+    the office looks for who can go next. A chain therefore gives the same log however
+    many turns may run at once
+  an agent that works in batches (the collector) is triggered only when nobody is
+    working and nobody else can start, and then takes its whole pile
+  up to `concurrency` turns run at once: 4 by default (PIXELAGENTS_CONCURRENCY). With 1
+    and deterministic providers the log is byte-for-byte reproducible; with more it is
+    reproducible in practice, and the two-desks fixture checks that it stays so
+  events from concurrent turns come out in the order they were emitted
 
 Turn (one instance, one trigger)
   AGENT_STARTED
-  context = system prompt + relation hints + readable tables (DOCUMENT_READ) + trigger documents
-  turn loop: the provider may call tools from uses_tool, bounded by maxToolCallsPerTurn
-    → TOOL_CALL / TOOL_RESULT, DECISION (tool_selection)
-  output document = the provider's final message
-  routing: required relations fire in `order`; among optional relations the provider
-    chooses zero or more → DECISION (routing)
-  each sends_to → MESSAGE_SENT; each writes_table → DOCUMENT_WRITTEN
+  context, in this order: the system prompt and relation hints; what arrived, in arrival
+    order, each message followed by its sheet; what the agent consults, in sentence order:
+    a table it reads (DOCUMENT_READ), a required tool called with the turn's input
+    (TOOL_CALL with required: true, TOOL_RESULT, no DECISION)
+  turn loop: the provider may call its optional tools, bounded by maxToolCallsPerTurn,
+    which the required calls count against → DECISION (tool_selection), TOOL_CALL / TOOL_RESULT
+  the provider ends with at most one sheet (new, a new version of one it holds, or one it
+    holds passed on as it is) and a message for each output it acts on (§9)
+  routing: required outputs fire in `order`; among optional ones the provider chooses zero
+    or more → DECISION (routing)
+  each sends_to → MESSAGE_SENT with the message and, if there is one, the sheet, photocopied
+    from the second recipient on; each writes_table → DOCUMENT_WRITTEN
   AGENT_FINISHED with the context snapshot and metrics
 
 Termination
   the run finishes on quiescence: no turn running, no mailbox pending, no pile with a
-    live taker non-empty → RUN_FINISHED with the exit agent's last output
+    live taker non-empty → RUN_FINISHED with the last sheet the exit agent wrote
   a join that can never be satisfied at quiescence → RUN_ERROR "Deadlock"
   any budget exceeded → RUN_ERROR "BudgetExceeded"
   the user can stop a run → RUN_ERROR "Stopped"
@@ -578,8 +722,15 @@ Budgets (per workflow, with defaults)
 ```
 
 The `AgentRuntime` interface (`run(workflow, input) -> AsyncIterator[EventDraft]`)
-stays. The office runtime is its second implementation; the linear
-SimpleRuntime may be deleted once the demo runs on relations.
+stays, and `OfficeRuntime` is its implementation: the linear runtime of
+revision 1 is gone. Every way a run can fail is a subclass of
+`AgentRuntimeError`, and its name is the `errorType` of the RUN_ERROR event:
+`WorkflowError`, `ToolError`, `BudgetExceeded`, `Deadlock`, `NoResult` (the
+office went quiet before the exit agent wrote a sheet), `Stopped`.
+
+A relation that has used up its rounds stops firing, and a DECISION of kind
+`budget` says so once. A cycle therefore ends by itself, and the run goes on
+to finish if the exit agent has produced a result.
 
 ---
 
@@ -590,13 +741,38 @@ agents, LLMs and external coding agents are interchangeable:
 
 ```python
 class TurnProvider(ABC):
-    async def run_turn(self, turn: TurnContext) -> AsyncIterator[TurnStep]:
-        """Yield tool calls and the final output; choose among the optional relations."""
+    def run_turn(self, turn: TurnContext) -> AsyncGenerator[TurnStep, ToolOutcome | None]:
+        """Yield a ToolRequest for each tool call (and receive its outcome), then one TurnResult."""
+
+    def works_in_batches(self, agent: Agent) -> bool: ...
 ```
 
-The runtime, not the provider, emits events, assigns document ids and applies
-budgets. A provider that runs its own loop (Claude Code, Pi) is wrapped by an
-adapter that translates its stream into turn steps.
+A provider decides; the runtime acts. `TurnContext` gives it the agent, what
+the turn starts from (the messages, and the sheets it holds), the context so
+far with the consults already in it, the optional tools it may call and the
+optional relations it may still act on. It yields `ToolRequest(tool,
+arguments, rationale)` and is sent back the `ToolOutcome`; it ends with
+`TurnResult(sheet, says, routes, rationale, writes)`:
+
+```text
+sheet      Sheet(title, content) it wrote, or the id of a sheet it holds to pass on, or None
+says       what it says along each output relation it acts on, by relation id; "" is allowed
+           and the bubble then shows the sheet's title
+routes     ids of the optional relations it chooses
+rationale  why, shown as the DECISION before each optional route
+writes     per-table sheets, only when a table should get something other than `sheet`
+           (the splitter writes many)
+```
+
+The runtime, not the provider, emits events, assigns document ids and
+versions, photocopies for a fan-out and applies budgets. A provider that runs
+its own loop (Claude Code, Pi) is wrapped by an adapter that translates its
+stream into these steps.
+
+Providers today: `fake` (uses each optional tool once, writes what is
+scripted, says a scripted line to each recipient, takes the first option) and
+`rule` (§11). The router passes its sheet on unchanged: `sheet` is the id it
+holds, `says` is empty.
 
 ---
 
@@ -613,7 +789,7 @@ GET /tools              lists every tool with its source
 ```
 
 Mock tools remain for the demo and tests. The "workshop", a coding agent that
-writes, tests and registers a new MCP server from a description, is Phase 16
+writes, tests and registers a new MCP server from a description, is Phase 19
 and is itself an observable run.
 
 ---
@@ -657,8 +833,9 @@ animation.
 ```text
 RUN_STARTED                  RESET, SHOW_DOCUMENT(task, in-tray)
 AGENT_STARTED                SET_STATUS(thinking), TAKE_DOCUMENT for each sheet it starts from
-MESSAGE_SENT (same room)     SHOW_DOCUMENT(sheet, sender's hand), MOVE_TO(target), TALK, SHOW_BUBBLE,
-                             HAND_DOCUMENT(target), SET_STATUS(waiting), RETURN
+MESSAGE_SENT (same room)     with a sheet: SHOW_DOCUMENT(sheet, sender's hand), MOVE_TO(target), TALK,
+                             SHOW_BUBBLE(message), HAND_DOCUMENT(target), SET_STATUS(waiting), RETURN
+                             words only: MOVE_TO(target), TALK, SHOW_BUBBLE(message), SET_STATUS(waiting), RETURN
 MESSAGE_SENT (other room)    MOVE_TO(phone|fax), TALK, RING_PHONE(target room) | FAX_SEND, RETURN
 TOOL_CALL                    MOVE_TO(station), WORK, SHOW_TOOL_ICON
 TOOL_RESULT                  SHOW_BUBBLE(result), HIDE_TOOL_ICON, RETURN
@@ -675,7 +852,9 @@ Document actions: `SHOW_DOCUMENT` puts a sheet somewhere at once (just written,
 or a new version of it); `HAND_DOCUMENT`, `PLACE_DOCUMENT` and `TAKE_DOCUMENT`
 make it travel, and cost no time when it is already there; `FILE_DOCUMENTS`
 takes an agent's sheets off the scene. Still to come with rooms: `RING_PHONE`,
-`FAX_SEND`. Camera focus is a UI concern, not a visual action.
+`FAX_SEND`. A tool the runtime consulted animates like one the model chose;
+only the DECISION bubble before it is missing. Camera focus is a UI concern,
+not a visual action.
 
 The in-tray stands by the entry agent and the out-tray by the exit agent. The
 sheets the world shows after any event are exactly the documents the registry
@@ -749,48 +928,56 @@ change to the log.
 
 # 23. UI Layout
 
-The world fills the screen. Everything else is a collapsible panel with a
-keyboard shortcut; panel state is remembered per browser (`localStorage`).
+The world fills the screen. Everything else is a window that opens from an
+icon and closes again; window state is remembered per browser
+(`localStorage`). The chrome is the game's (§29): what is open is a pixel-art
+window laid on the office, not a web panel docked beside it. Nothing is open
+by default but the icon bar and the playback strip.
 
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│ [BUILD | RUN | REPLAY]              ▶ RUN   [G] graph   │
+│ BUILD                                           ▶ RUN   │
 │                                                         │
-│ office ▸          WORLD, FULL SCREEN         ◂ inspector│
-│  workflow                                               │
-│  agents            ┌────────┐  ┌────────┐               │
-│  tools             │ room A │☎ │ room B │               │
-│  runs              └────────┘  └────────┘               │
-│                                                         │
-│ log ▸  (transcript as a game message feed)              │
-├─────────────────────────────────────────────────────────┤
-│ ◀ ▶ 1x ━━━━━●━━━━━━━━━━━━ 12/38           [▾ timeline]  │
+│                  WORLD, FULL SCREEN                     │
+│                                      ╔═ Luca ═══════╗   │
+│        ┌────────┐  ┌────────┐        ║ Researcher   ║   │
+│        │ room A │☎ │ room B │        ║ arrives  …   ║   │
+│        └────────┘  └────────┘        ║ consults …   ║   │
+│                                      ║ goes out …   ║   │
+│                                      ╚══════════════╝   │
+│ [O][I][L][T][G][?]   ◀ ▶ 1x ━━━━━●━━━━━━━ 12/38   − +  │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ```text
-office   [O]  left. The workflow file, its agents and tools, the stored runs. Its
-              sections collapse one by one. The palette is the part of it that adds
-              things (agents, tool stations; later tables and rooms): BUILD only.
-inspector [I] right. Opens by itself when something is selected; tabs in §26.
-log      [L]  the transcript, bottom-left, like a game message feed. Only while a
-              run is on screen.
-timeline [T]  drawer above the playback bar
-playback [B]  always visible; collapses to a thin strip that still shows progress
+icon bar      bottom-left, one icon per window, lit while it is open; the letters below
+              are its keys. With the playback strip it is the only part of the interface
+              that is always there.
+office   [O]  the workflow file: name, task, what it still lacks before it can run, the
+              stored runs, and what adds things (agents, tables; later rooms): BUILD only.
+inspector [I] what is selected, in a window beside it. Opens by itself on selection. In
+              BUILD it holds only the configuration form; sentences are edited on the
+              character (§24). Tabs in §26.
+log      [L]  the transcript as a game message feed, bottom-left above the bar. Only
+              while a run is on screen.
+timeline [T]  drawer above the playback strip
+playback [B]  always visible as a thin strip: play, step, speed, progress, and zoom
 graph    [G]  the workflow as a blueprint laid over the world
-hide all [H]  collapses every panel, and brings back the same ones
+help     [?]  every shortcut
+hide all [H]  closes every window, and brings back the same ones
 ```
 
-Playback from the keyboard: Space play/pause, ← → step, Home / End, − / + speed.
-Ctrl+Enter runs, Ctrl+S saves, ? lists every shortcut. A plain key never fires
-while the user is typing in a field. Shortcuts are data (`hud/shortcuts.ts`): the
-help list is rendered from the table that implements them.
+Playback from the keyboard: Space play/pause, ← → step, Home / End, `,` `.`
+slower / faster. Camera: `−` `+` zoom out / in. Ctrl+Enter runs, Ctrl+S
+saves, ? lists every shortcut. A plain key never fires while the user is
+typing in a field. Shortcuts are data (`hud/shortcuts.ts`): the help list is
+rendered from the table that implements them.
 
 The mode is not separate state: it is whether a run is on screen.
 
 ```text
 BUILD    no run on screen. The world previews the workflow. The only mode that
-         edits it: palette, configuration form, graph editing.
+         edits it: the menu on a character or object, the configuration form.
 RUN      following a live run. Becomes REPLAY by itself when execution ends, even
          if the visualization is still catching up.
 REPLAY   showing a stored run. Lists, inspector and graph describe what was
@@ -799,33 +986,80 @@ REPLAY   showing a stored run. Lists, inspector and graph describe what was
 
 Switching mode never changes the workflow.
 
-The camera frames the room in the space the open side panels leave free, and
-re-frames when they open or close, unless the user has zoomed or panned.
-Selection (the ring under a character) is interface state: it is kept out of
-`WorldState`, which is derived from events only.
+Camera. The world is zoomable, and it must be obvious that it is:
+
+```text
+pinch, and ⌘ / Ctrl + wheel                     zoom around the pointer
+wheel, two-finger scroll, dragging the floor    pan
+− + keys, two buttons on the playback strip     zoom out / in by one step
+double-click                                    re-frame the room
+```
+
+Zoom steps are integer multiples of the base pixel scale, from 1 to 8, plus
+one half for the overview of a building: at any other scale pixel art
+shimmers. "Fit" is the largest step at which the room fits the space the open
+windows leave free. It is where the camera starts and returns to, and it
+re-frames when windows open or close, unless the user has zoomed or panned.
+Windows and the icon bar are anchored to the screen; the context menu and the
+speech bubbles follow the camera. Selection (the ring under a character) is
+interface state: it is kept out of `WorldState`, which is derived from events
+only.
+
+Until Phase 14 the windows are the plain panels of Phase 7, under the same
+keys; the camera controls come with Phase 12, the icon bar with Phase 14.
 
 ---
 
 # 24. Build Mode
 
-Editing happens on the characters and objects:
+What exists today: agents and tables are added in the Office panel, and what
+an agent does is said in its inspector, one sentence at a time: pick a verb,
+pick what it applies to, add. Each sentence can be reordered, removed, or (for
+handing over and writing) left to the agent with "if it chooses". A router's
+rules are edited there too. The Office panel says what a workflow still lacks
+before it can run.
+
+Where it goes: the sentences are edited on the characters and objects
+themselves, and the inspector keeps only the configuration form. Nothing is
+connected by dragging; a target is picked in the world.
 
 ```text
-click a character      context menu:
-                         Configure (name, role, prompt, model, sprite, instances, room)
-                         Relations: the list of this agent's sentences, reorderable,
-                           required toggle, delete
-                         Add relation: verb dropdown, then object dropdown filtered by
-                           the verb's object type
-drag agent onto agent  creates sends_to
-drag agent onto station  creates uses_tool
-drag agent onto table  asks: reads / writes / takes
-drag anything          moves it (layout only)
-palette                new agent, new table, new room, place a station
+click a character      a menu in a bubble where the character stands:
+                         the three slots (§7) with their sentences; on each: up / down,
+                           "always" / "if it chooses" where the verb allows it, delete;
+                           the hand-offs that arrive from others are listed greyed, with
+                           a jump to the sender
+                         add: a verb for the slot, then its target, picked in the world
+                         Configure: opens the configuration window (name, role, prompt,
+                           model, sprite, instances, room; a router's rules)
+                         Remove
+pick a target          the menu folds away, the office dims, and only what the verb
+                         accepts stays lit: characters for sends_to / waits_for, tables
+                         of the right mode for reads / writes / takes, stations for
+                         uses_tool. Hovering rings one; a click adds the sentence; Esc,
+                         or a click on the dimmed floor, cancels. Nothing else responds
+                         while a target is being picked. The subject itself is never lit.
+can use / consults     when no station for that tool stands in the room yet, the menu
+                         lists the tools the server knows (GET /tools), each with its
+                         icon and whether it can be consulted first; choosing one adds
+                         the sentence and the layout places the station. A station
+                         already in the room is picked like any target.
+click a table          its menu: name, mode (shared / pile), scope; who reads, writes,
+                         takes from it; remove
+click a station        its menu: the tool, its source, who can use it
+click the floor        add: a character, a table (later: a room, a station)
+drag anything          moves it. Layout only. Dragging never connects.
 ```
 
-Every edit goes through pure functions on the workflow (`workflowEdits.ts`)
-into `workflowStore`, then `PUT /workflows/{id}`. The world never edits a run.
+Every edit goes through pure functions on the workflow
+(`build/workflowEdits.ts`) into `workflowStore`, then `PUT /workflows/{id}`.
+They refuse the same sentences the server refuses, and the picking mode lights
+only targets they would accept, so a click never meets a refusal. Picking is
+interface state in `uiStore` (a pending `{ subject, verb }`), next to
+selection and apart from it: while something is pending, a click means "this
+one", not "select". The menu and the picking overlay are HTML laid over the
+canvas and positioned from world coordinates, so they follow the camera; the
+world itself only lights and dims. The world never edits a run.
 
 ---
 
@@ -836,9 +1070,11 @@ XYFlow, read-only. Nodes: agents, tools, tables, grouped by room. Edges:
 relations labelled by verb, dashed when optional. It is a blueprint for
 review and for people who think in boxes.
 
-Until Phase 10 the graph is still the stored model, and until Phase 11 it is
-where agents get connected: the overlay is editable in BUILD and read-only
-whenever a run is on screen.
+It is worked out from the relations every time, positions included, so it
+cannot disagree with them and nothing about it is stored. Agents are laid out
+left to right by how many hand-offs they are from the entry, with tools and
+tables below. Nothing in it can be moved, connected or deleted; clicking a
+node inspects it.
 
 ---
 
@@ -857,6 +1093,10 @@ Tool       definition, schema, source (builtin / mcp:<server>), recent calls
 Runtime fields where available: status, model, context tokens, last received,
 last action, latency, duration, cost, errors. All optional: runtimes differ.
 
+The agent's Configuration tab shows its sentences grouped in the three slots
+of §7, read-only for a run. In BUILD the sentences are edited on the character
+(§24); the tab is the form for everything else about it.
+
 ---
 
 # 27. Transcript
@@ -865,12 +1105,21 @@ Every run exposes a readable activity log generated deterministically from
 templates, one per event type and verb. No LLM required.
 
 ```text
-14:31:02  Anna handed a sheet to Luca: "Find the latest sales number."
+14:31:02  Anna to Luca: "Find the latest sales number." and handed over "Task".
+14:31:03  Luca consulted the library.
 14:31:05  Luca searched the web.
 14:31:07  Web search returned 12 results.
 14:31:09  Luca (2) took a sheet from the "to research" pile, 33 left.
+14:31:10  Luca to Gianni: "Send this to management." and handed over "Sales number".
+14:31:11  Anna to Luca: "Go ahead."
 14:31:12  Gianni sent the email.
 ```
+
+A hand-off reads as what was said, then what was handed, and either half may
+be missing: a message alone is just the words; a sheet alone (a log from
+before revision 3, or an empty message) reads `Anna handed "Task" to Luca`.
+A tool the runtime consulted reads "consulted"; a tool the model chose reads
+by its own template.
 
 The verbs of §7 and the templates here share one vocabulary: what the user
 writes as a rule reads back as a sentence in the log.
@@ -891,6 +1140,26 @@ high information readability. A developer tool first, a game second: never
 hide a technical error behind an animation, never show long LLM output inside
 the world. Speech bubbles show abbreviated content; clicking expands.
 
+The interface is gamified in its chrome, not in its content. RimWorld is the
+proof that a dense inspector and a game can be one thing. Rules:
+
+```text
+windows        pixel-art frames (a nine-slice border), the palette of the world, flat:
+               no blur, no rounded corners, no drop shadows
+type           a pixel font that stays readable at body size, drawn at an integer scale;
+               readability beats authenticity, and a table of fields stays a table of fields
+icons          one per window on the bar, one per tool on its station, one per status
+               over a character's head (thinking, waiting, working, error)
+world first    whatever can be shown on the office is: bubbles, sheets, trays, status
+               icons, the alert on an error. A window is for what does not fit on the floor.
+HTML, styled   windows, menus and the bar are React and CSS styled to the pixel; only the
+               world is PixiJS. Forms and scrolling text inside a canvas are not worth it.
+later          objects in the room as entry points: an archive cabinet that opens the
+               stored runs, a bulletin board that lists what the workflow lacks, a wall
+               clock for playback. After the icon bar, never instead of it: an object
+               hides what an icon shows.
+```
+
 ---
 
 # 30. Project Structure
@@ -907,28 +1176,32 @@ pixel-agents/
     events/                 models.py, emitter.py
     documents/              models.py, registry.py (fold of the log; twin of web protocol/documents.ts)
     runtime/
-      base.py               AgentRuntime
+      base.py               AgentRuntime, and one exception class per way a run can fail
       office_runtime.py     scheduler + turns + budgets
       turn.py               TurnProvider, TurnContext, TurnStep
-      providers/            fake.py, rule.py, anthropic.py, claude_code.py, pi.py
-    workflow/               models.py, relations.py, migrate.py, demo.py
+      providers/            fake.py, rule.py (later: anthropic.py, claude_code.py, pi.py)
+    workflow/               models.py, relations.py, migrate.py, demo.py, executor.py
     tools/                  base.py, mcp.py, mock_search.py, mock_email.py, calculator.py
     storage/                database.py, event_repository.py, run_repository.py, workflow_repository.py
     websocket/              manager.py
   apps/web/src/
-    protocol/               events.ts, workflow.ts, documents.ts
+    protocol/               events.ts, workflow.ts, relations.ts (the verbs), migrate.ts, documents.ts
     animation/              VisualEventMapper.ts, visualActions.ts, lanes.ts, EventAnimation.ts,
                             AnimationScheduler.ts
     world/                  PixelWorld.ts, AgentSprite.ts, DocumentSprite.ts, Furniture.ts (trays, tables),
-                            Room.ts, Devices.ts, ToolStation.ts, SpeechBubble.ts, Camera.ts, layout.ts,
-                            worldState.ts
-    build/                  BuildMode.tsx, ContextMenu.tsx, RelationEditor.tsx, Palette.tsx, dragRules.ts
-    graph/                  GraphView.tsx (read-only), deriveGraph.ts
+                            Room.ts, Devices.ts, ToolStation.ts, SpeechBubble.ts, sprites.ts,
+                            Camera.ts (zoom steps, gestures), layout.ts, worldState.ts
+    build/                  workflowEdits.ts (later: ContextMenu.tsx, picking.ts (the pending sentence
+                            and what it lights), Palette.tsx, dragMove.ts)
+    graph/                  GraphView.tsx (read-only), deriveGraph.ts, nodes.tsx
     hud/                    panels.ts (state, persistence, insets), shortcuts.ts (the table),
                             useShortcuts.ts, Panel.tsx, TopBar.tsx, OfficePanel.tsx,
-                            GraphOverlay.tsx, ShortcutHelp.tsx
+                            GraphOverlay.tsx, ShortcutHelp.tsx (later: IconBar.tsx, Window.tsx,
+                            pixel.css: frames, type, icons)
     debugger/               ReplayController.ts, Timeline.tsx, PlaybackBar.tsx, TranscriptPanel.tsx, transcript.ts
-    inspector/              AgentInspector.tsx, DocumentInspector.tsx, documentView.ts, EventInspector.tsx, ...
+    inspector/              AgentInspector.tsx, AgentConfigForm.tsx, RelationEditor.tsx (the three slots,
+                            shared with the context menu), TableInspector.tsx, DocumentInspector.tsx,
+                            documentView.ts, EventInspector.tsx, runtimeView.ts, ...
     state/                  workflowStore.ts, runStore.ts, replayStore.ts, uiStore.ts, actions.ts
 ```
 
@@ -973,10 +1246,16 @@ Prioritize event semantics over animations.
 ```text
 event ordering and sequence uniqueness
 event persistence and serialization
-workflow validation and v1 → v2 migration
+workflow validation, and v1 → v2 migration the same on server and web
 relation semantics: required order, optional routing, waits_for joins, maxRounds
-scheduler determinism with concurrency 1 (byte-for-byte log equality)
-termination: quiescence, deadlock, budgets
+required uses_tool: called once at turn start with the turn's input, no DECISION, counted
+  against maxToolCallsPerTurn; refused for a tool with more than one argument, both sides
+hand-offs: a message without a sheet; a sheet photocopied to several recipients; a sheet
+  written under a held title becomes a new version; a held sheet passed on keeps its id
+tables: versions on a shared table, a pile taken sheet by sheet, the collector's batch
+scheduler determinism: byte-for-byte with one turn at a time, stable with several
+concurrency changes the order of the log, never what happens
+termination: quiescence, deadlock, no result, budgets, a user's stop
 document registry fold: server and web agree on the shared fixtures, after every event
 the world shows exactly the sheets the registry says are in sight, after every event
 logs written before a protocol addition still fold and replay
@@ -986,26 +1265,36 @@ event → visual action mapping, per verb and per event type
 transcript templates, per verb and per event type
 graph derivation from relations
 build-mode edits as pure workflow functions
+target picking: what a pending sentence lights is exactly what the edit would accept;
+  Esc cancels and leaves the workflow untouched
+camera: zoom steps and fit as pure functions of view, world and insets
 ```
 
 Example:
 
 ```text
-given MESSAGE_SENT anna → luca, same room
-expect MOVE_TO luca, TALK, SHOW_BUBBLE, HAND_DOCUMENT, RETURN_TO_POSITION
+given MESSAGE_SENT anna → luca, same room, with a sheet
+expect MOVE_TO luca, TALK, SHOW_BUBBLE(message), HAND_DOCUMENT, RETURN_TO_POSITION
+
+given MESSAGE_SENT anna → luca, same room, words only
+expect MOVE_TO luca, TALK, SHOW_BUBBLE(message), RETURN_TO_POSITION
 ```
 
 Fixtures shared by both test suites live in `tests/fixtures/`, shaped like run
 exports so they also open in the UI (Runs → Open file):
 
 ```text
-demo_run.json     the demo of §34 exactly as the runtime emits it; the server test fails
-                  if the runtime stops producing it, and the web tests run on it
-tables_run.json   a hand-written run with a pile and a shared table, until a runtime
-                  emits such events itself
-parallel_run.json a hand-written run where two agents work at once and their events
-                  alternate in the log: what the animation lanes are tested on
+demo_run.json     workflows/demo.json: the demo of §34
+tables_run.json   workflows/supplier_board.json: a pile worked sheet by sheet, a shared
+                  board, a splitter and a collector
+parallel_run.json workflows/two_desks.json, two turns at once: two agents at work at the
+                  same time and a third who waits for both
+workflow_v1.json  workflows of revision 1 next to what they upgrade to
 ```
+
+The three runs are real: each is exactly what the runtime emits for that
+workflow, the server test fails if it stops doing so, and the web tests run on
+them.
 
 Regenerate after an intended change with
 `UPDATE_FIXTURES=1 uv run pytest tests/test_fixtures.py` and review the diff.
@@ -1018,14 +1307,20 @@ Maintain one deterministic demo workflow at all times. It needs no API keys.
 It is the integration test and the demo. Never break it.
 
 ```text
-Anna (is_entry) hands Luca: "Find the latest sales number."
-Luca uses web_search. MockSearch returns "Sales: €1.2M".
-Luca hands Gianni: "Send this result to management: Sales: €1.2M".
-Gianni uses send_email. MockEmail returns success. Gianni is_exit.
+Anna (is_entry) says to Luca "Find the latest sales number." and passes on the task sheet.
+Luca uses web_search. MockSearch returns "Sales: €1.2M". Luca writes the sheet "Sales number".
+Luca says to Gianni "Send this to management." and hands over the sheet.
+Gianni uses send_email. MockEmail returns success. Gianni writes "Email sent" and is_exit.
 ```
 
-Expressed as relations in `workflows/demo.json` (§6). A second demo, added
-in Phase 14, exercises scale: a splitter, a pile, "Luca ×3", a collector.
+Until Phase 11 the hand-offs carry the sheet alone, with the words as its
+content; the demo passes either way.
+
+Expressed as relations in `workflows/demo.json` (§6). Two more workflows ship
+beside it and need no API keys either: `supplier_board.json` (a splitter, two
+piles, a shared board, a collector) and `two_desks.json` (two agents at once
+and a join). Their runs are fixtures too (§33). Phase 17 adds the same at
+scale: "Luca ×3".
 
 ---
 
@@ -1081,9 +1376,13 @@ it, fork the run. Do not start it before replay and relations are stable.
 
 # 38. Development Order
 
-Phases 1–9 are done (§4). Each phase below ends with `npm test` green and
+Phases 1–10 are done (§4). Each phase below ends with `npm test` green and
 the demo of §34 passing. Do not start a phase before the previous one is
 merged.
+
+Phases 11–14 are revision 3's own changes, in the order they were decided:
+the model first, then the small camera work, then building in the world,
+then the look. The phases after them are revision 2's, renumbered.
 
 ## Phase 7 — World-first shell (done)
 
@@ -1119,55 +1418,115 @@ camera: follows the agent of the stepped event when it is out of view
 timeline and log mark every event on show, not just one
 ```
 
-## Phase 10 — Relations and the office runtime
+## Phase 10 — Relations and the office runtime (done)
 
 ```text
 workflow schema v2: rooms (one), agents.roomId / instances, tables, relations, budgets, layout
-migrate.py: v1 nodes / edges → relations; demo.json rewritten by hand in v2
-office_runtime.py: scheduler, turns, waits_for joins, required order, optional routing
-  (fake provider picks the first optional), maxRounds, quiescence, deadlock, budgets
+migrate.py and migrate.ts: v1 nodes / edges → relations, the same on both sides
+office_runtime.py: all eight verbs; scheduler, turns, waits_for joins, required order,
+  optional routing (the fake provider takes the first option), maxRounds, tables,
+  quiescence, deadlock, no result, budgets, several turns at once
 TurnProvider interface; fake and rule providers (splitter, collector, router)
-POST /runs/{id}/stop
-graph view derived from relations, read-only; old graph editing removed
-SimpleRuntime and plan.py deleted once the demo runs on the office runtime
+POST /runs/{id}/stop, and a STOP button
+sentence editor in the agent inspector; tables added and edited from the Office panel
+graph view derived from relations, read-only; graph editing, SimpleRuntime and plan.py removed
+the three fixture runs are real runs of workflows/*.json
 ```
 
-## Phase 11 — Build mode in the world
+The sentence editor was planned for Phase 11. It moved here because removing
+graph editing without it would have left no way to build a workflow.
+
+## Phase 11 — Three slots and the spoken message
+
+The model changes of revision 3, end to end, before any new interface.
+Nothing in this phase needs an API key.
 
 ```text
-context menu on characters: configure, relations list, add relation
-drag rules: agent → agent, agent → station, agent → table
-palette: agents, tables, stations from GET /tools
-layout positions saved with the workflow
-pure edit functions tested; the world never touches a run
+§7: `required` on uses_tool, default false; a required tool is called at turn start with the
+  turn's input, TOOL_CALL carries required: true, no DECISION; refused on both sides for a
+  tool with more than one argument; `order` governs consults in the context
+§8: the routine is gone from the doc, the editor and the runtime: nothing is sequenced
+  inside a turn beyond what `order` says
+TurnResult(sheet, says, routes, rationale, writes); fake, rule and router providers updated
+MESSAGE_SENT carries `message`, and a sheet only when there is one; photocopies with copyOf;
+  a sheet written under a held title is a new version; a held sheet passed on keeps its id
+AGENT_STARTED.input is messages then sheets; RUN_FINISHED is the exit agent's last written
+  sheet, NoResult otherwise
+registry folds on both sides read the new hand-offs and still read the old; fixtures
+  regenerated and reviewed; logs from Phase 10 still fold and replay
+VisualEventMapper: a hand-off with words only; the bubble shows the message
+transcript: `Anna to Luca: "…" and handed over "…"`, and "consulted" for a required tool
+the sentence editor in the inspector shows the three slots, with "consults first" where
+  allowed; the phrase lists on both sides say hands to, consults first
+the demo of §34 in its new wording, still deterministic, still passing
 ```
 
-## Phase 12 — Real LLM agent
+## Phase 12 — Camera
 
 ```text
-providers/anthropic.py behind TurnProvider: tool loop + routing among optional relations
+pinch and ⌘/Ctrl+wheel zoom; wheel and two-finger scroll pan; drag pans; double-click fits
+zoom steps as integer multiples of the base scale, plus one half; fit as the largest step
+  that fits
+− + keys and two buttons on the playback strip; speed moves to , .
+fitView, the steps and the gesture arithmetic as pure functions with tests
+the camera still follows the stepped event and still re-frames beside open panels
+```
+
+## Phase 13 — Build on the characters
+
+```text
+context menu on a character, a table, a station and the floor (§24), as HTML that follows
+  the camera
+the three-slot editor of Phase 11 moved into the menu; the inspector keeps the
+  configuration form
+target picking: a pending sentence in uiStore dims the office and lights what the verb
+  accepts; click adds, Esc cancels; the tool list when no station stands in the room
+drag to move things; layout positions saved with the workflow; dragging never connects
+the floor menu adds a character or a table
+the Office panel keeps the file-level view: name, task, what the workflow lacks, runs
+the world never touches a run
+```
+
+## Phase 14 — The game interface
+
+```text
+the icon bar; windows closed by default; the same keys and the same localStorage memory
+pixel-art chrome (§29): frames, type, icons, palette; blur, rounded corners and shadows gone
+office, inspector, log, timeline, help and the playback strip restyled; the graph overlay too
+status icons over characters' heads; the alert on an error stays in the world
+the layout of §23: icon bar bottom-left, windows beside what they describe
+afterwards, only if it earns its place: the archive cabinet, the bulletin board, the wall clock
+```
+
+## Phase 15 — Real LLM agent
+
+```text
+providers/anthropic.py behind TurnProvider: the consults already in the prompt, a tool loop
+  over the optional tools, one sheet and one line per recipient as structured output,
+  routing among optional relations
 token and cost metrics in AGENT_FINISHED
 the demo stays on the fake provider; a second workflow uses the real one
 ```
 
-## Phase 13 — MCP tools
+## Phase 16 — MCP tools
 
 ```text
 tools/mcp.json, tools/mcp.py adapter, tool names mcp:<server>/<tool>
-GET /tools reports the source; stations placed for MCP tools like any other
-one custom MCP server in tools/ as the example
+GET /tools reports the source and whether a tool can be consulted first (one string
+  argument); stations placed for MCP tools like any other
+one custom MCP server in tools/ as the example: a library, consulted first
 ```
 
-## Phase 14 — Scale
+## Phase 17 — Scale
 
 ```text
 instances > 1 at run start; actorInstance in events, instanceKey in the world
-pile tables with takes_from_table; splitter and collector rule agents
-second demo: fifty suppliers, Luca ×3
+(piles, takes_from_table, the splitter and the collector exist since Phase 10)
+the supplier board at scale: fifty suppliers, Luca ×3
 timeline compression of repeated stretches
 ```
 
-## Phase 15 — Rooms
+## Phase 18 — Rooms
 
 ```text
 several rooms, layout as a building, camera overview / follow
@@ -1175,7 +1534,7 @@ phone, fax, intranet totem devices; RING_PHONE / FAX_SEND actions
 timeline lanes grouped by room
 ```
 
-## Phase 16 — Adapters and the workshop
+## Phase 19 — Adapters and the workshop
 
 ```text
 providers/claude_code.py and providers/pi.py: an agent is an external coding-agent session
@@ -1193,14 +1552,16 @@ Milestone 1, done: press Run, Anna walks to Luca and asks, Luca works at the
 computer, Luca reports, Gianni sends the email, and the run can be replayed
 step by step with every event inspectable.
 
-Milestone 2, the target of Phases 7–11:
+Milestone 2, the target of Phases 7–14:
 
-> With no graph on screen, I place three characters in a room, give Luca a
-> computer and Gianni an email station, tell Anna to hand to Luca and Luca to
-> hand to Gianni, press Run, watch it happen, click the sheet Luca handed to
-> Gianni and read it, then replay the run step by step.
+> With no graph on screen, I place three characters in a room, click Luca and
+> give Luca a computer, click Gianni and give Gianni an email station, click
+> Anna and pick Luca in the room as who Anna hands to, the same for Luca and
+> Gianni, press Run, watch Anna walk over and say it, click the sheet Luca
+> handed to Gianni and read it, then replay the run step by step, zoomed in
+> on Luca.
 
-Milestone 3, the target of Phases 12–15:
+Milestone 3, the target of Phases 15–18:
 
 > Anna hands a list of fifty suppliers to the splitter, three Lucas work the
 > pile in parallel, the collector staples the results and Gianni emails them,
