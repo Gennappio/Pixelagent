@@ -1096,7 +1096,7 @@ button.link {
 
 .help dt {
   flex: none;
-  width: 96px;
+  width: 104px;
   color: var(--muted);
 }
 
@@ -1149,15 +1149,23 @@ button.link {
   accent-color: var(--accent);
 }
 
+/* Collapsed, the bar is a thin strip: the progress, which opens it again, and the zoom. */
 .playback-strip {
-  position: relative;
-  display: block;
+  display: flex;
+  align-items: stretch;
   width: 100%;
-  height: 16px;
+  height: 20px;
+  background: var(--bg);
+}
+
+.playback-strip .strip-progress {
+  position: relative;
+  flex: 1;
+  min-width: 0;
   padding: 0;
   border: 0;
   border-radius: 0;
-  background: var(--bg);
+  background: none;
   overflow: hidden;
 }
 
@@ -1170,8 +1178,57 @@ button.link {
 
 .playback-strip .label {
   position: relative;
-  font: 700 10px/16px ui-monospace, monospace;
+  font: 700 10px/20px ui-monospace, monospace;
   color: var(--text);
+}
+
+/* Zoom: out, the step the camera rests at (which frames the room again), in. Three
+   buttons joined into one control, plain to see: the world zooms, and this says so. */
+.zoom {
+  display: inline-flex;
+  align-items: stretch;
+  flex: none;
+}
+
+.zoom button,
+.playback-bar .zoom button {
+  min-width: 28px;
+  padding: 3px 7px;
+  border-radius: 0;
+  font: 700 14px/1 ui-monospace, monospace;
+}
+
+.zoom button + button {
+  border-left: 0;
+}
+
+.zoom button:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.zoom button:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.zoom .zoom-level,
+.playback-bar .zoom .zoom-level {
+  min-width: 40px;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+/* Framing the room is what the camera does by itself: there is nothing to go back to. */
+.zoom .zoom-level.fitted {
+  color: var(--text);
+}
+
+.playback-strip .zoom button {
+  padding: 0 7px;
+  border-top: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .counter {

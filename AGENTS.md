@@ -177,9 +177,13 @@ Phase 11  the three slots and the spoken message: `required` on uses_tool, and a
           both folds read hand-offs old and new, and the logs of Phase 10 are kept as
           fixtures; the bubble and the transcript say what was said; the sentence
           editor in the inspector shows the three slots
+Phase 12  the camera: it rests on whole zoom steps, and "fit" is the largest at which
+          the room fits beside the open panels; pinch or Ctrl / ⌘ + wheel zooms around
+          the pointer, the wheel alone and dragging the floor pan, double-click
+          re-frames; − + keys and two buttons on the playback bar; speed on , .
 ```
 
-Not done: everything in §38 from Phase 12 on. Revision 3 rewrote the plan from
+Not done: everything in §38 from Phase 13 on. Revision 3 rewrote the plan from
 Phase 11: Phases 11–14 are the changes this revision makes (the three slots and
 the spoken message, the camera, building on the characters, the game
 interface), and the phases of revision 2 follow them, renumbered. Today a
@@ -1021,7 +1025,9 @@ interface state: it is kept out of `WorldState`, which is derived from events
 only.
 
 Until Phase 14 the windows are the plain panels of Phase 7, under the same
-keys; the camera controls come with Phase 12, the icon bar with Phase 14.
+keys, and the icon bar comes with them. The camera controls are in place since
+Phase 12: the two zoom buttons, with the step the camera rests at between
+them, are at the end of the playback bar and on the thin strip it collapses to.
 
 ---
 
@@ -1217,13 +1223,14 @@ pixel-agents/
     graph/                  GraphView.tsx (read-only), deriveGraph.ts, nodes.tsx
     hud/                    panels.ts (state, persistence, insets), shortcuts.ts (the table),
                             useShortcuts.ts, Panel.tsx, TopBar.tsx, OfficePanel.tsx,
-                            GraphOverlay.tsx, ShortcutHelp.tsx (later: IconBar.tsx, Window.tsx,
+                            GraphOverlay.tsx, ShortcutHelp.tsx, ZoomControl.tsx (later: IconBar.tsx, Window.tsx,
                             pixel.css: frames, type, icons)
     debugger/               ReplayController.ts, Timeline.tsx, PlaybackBar.tsx, TranscriptPanel.tsx, transcript.ts
     inspector/              AgentInspector.tsx, AgentConfigForm.tsx, RelationEditor.tsx (the three slots,
                             shared with the context menu), TableInspector.tsx, DocumentInspector.tsx,
                             documentView.ts, EventInspector.tsx, runtimeView.ts, ...
-    state/                  workflowStore.ts, runStore.ts, replayStore.ts, uiStore.ts, actions.ts
+    state/                  workflowStore.ts, runStore.ts, replayStore.ts, uiStore.ts, cameraStore.ts,
+                            actions.ts
 ```
 
 Create packages only for boundaries that are genuinely shared.
@@ -1401,7 +1408,7 @@ it, fork the run. Do not start it before replay and relations are stable.
 
 # 38. Development Order
 
-Phases 1–11 are done (§4). Each phase below ends with `npm test` green and
+Phases 1–12 are done (§4). Each phase below ends with `npm test` green and
 the demo of §34 passing. Do not start a phase before the previous one is
 merged.
 
@@ -1525,7 +1532,7 @@ the examples     supplier_board has Luca consult the search first; two_desks sho
                  someone's hands, so the shared fixtures cover every kind of hand-off
 ```
 
-## Phase 12 — Camera
+## Phase 12 — Camera (done)
 
 ```text
 pinch and ⌘/Ctrl+wheel zoom; wheel and two-finger scroll pan; drag pans; double-click fits
@@ -1534,6 +1541,30 @@ zoom steps as integer multiples of the base scale, plus one half; fit as the lar
 − + keys and two buttons on the playback strip; speed moves to , .
 fitView, the steps and the gesture arithmetic as pure functions with tests
 the camera still follows the stepped event and still re-frames beside open panels
+```
+
+Settled while building it, where this document left room:
+
+```text
+fit              the room fits a step when it is no larger than the free area, with no
+                 margin: twice the room in exactly twice its size is a fit
+a zoom gesture   wheel travel adds up to a step every 40 pixels. One event is never worth
+                 more than one step, so a mouse wheel moves one step per notch whatever
+                 the browser says a notch is, and a pinch one step per so much pinching.
+                 A gesture that pauses for a quarter of a second, or turns round, starts over
+Safari           reports a pinch with its own gesture events, not as Ctrl + wheel: they
+                 feed the same arithmetic. It is the one path no test drives
+the keys         − and + repeat while held, and zoom around the middle of the free space.
+                 With Ctrl or ⌘ they stay the browser's own zoom
+never lost       however far the user pans or zooms, 96 pixels of the room stay in the
+                 space the panels leave free (keepInView)
+the control      out, the step the camera rests at, in: three joined buttons. The step
+                 frames the room again, like a double-click on the floor. It is on the
+                 playback bar and on the strip the bar collapses to
+cameraStore      what the interface knows of the camera (the step it rests at, whether it
+                 is framing by itself) and how keys and buttons reach it. Interface state,
+                 like the selection: not in WorldState. Phase 13 will need more of the
+                 framing here, to lay menus over the canvas
 ```
 
 ## Phase 13 — Build on the characters

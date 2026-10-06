@@ -21,9 +21,23 @@ describe("shortcutFor", () => {
     expect(press("ArrowLeft")).toEqual({ type: "previous" });
     expect(press("Home")).toEqual({ type: "toStart" });
     expect(press("End")).toEqual({ type: "toEnd" });
-    expect(press("+")).toEqual({ type: "faster" });
-    expect(press("=")).toEqual({ type: "faster" }); // the unshifted + on a US keyboard
-    expect(press("-")).toEqual({ type: "slower" });
+    expect(press(".")).toEqual({ type: "faster" });
+    expect(press(",")).toEqual({ type: "slower" });
+  });
+
+  it("maps − and + to the camera, not to the speed of the replay any more", () => {
+    expect(press("+")).toEqual({ type: "zoomIn" });
+    expect(press("=")).toEqual({ type: "zoomIn" }); // the unshifted + on a US keyboard
+    expect(press("-")).toEqual({ type: "zoomOut" });
+    // Held down, they keep going.
+    expect(press("+", { repeat: true })).toEqual({ type: "zoomIn" });
+    expect(press("-", { repeat: true })).toEqual({ type: "zoomOut" });
+    // With Ctrl or ⌘ they are the browser's own zoom, and are left to it.
+    for (const key of ["+", "=", "-"]) {
+      expect(press(key, { ctrlKey: true })).toBeNull();
+      expect(press(key, { metaKey: true })).toBeNull();
+    }
+    expect(press("+", { target: "editable" })).toBeNull();
   });
 
   it("never fires a plain shortcut while the user is typing", () => {
@@ -52,11 +66,13 @@ describe("shortcutFor", () => {
     expect(press("g", { target: "button" })).toEqual({ type: "togglePanel", panel: "graph" });
   });
 
-  it("repeats only the stepping keys while a key is held", () => {
+  it("repeats only the stepping and zooming keys while a key is held", () => {
     expect(press("ArrowRight", { repeat: true })).toEqual({ type: "next" });
     expect(press("ArrowLeft", { repeat: true })).toEqual({ type: "previous" });
     expect(press("g", { repeat: true })).toBeNull();
     expect(press(" ", { repeat: true })).toBeNull();
+    expect(press(".", { repeat: true })).toBeNull();
+    expect(SHORTCUTS.filter((shortcut) => shortcut.repeat).map((shortcut) => shortcut.action.type)).toEqual(["next", "previous", "zoomIn", "zoomOut"]);
   });
 });
 

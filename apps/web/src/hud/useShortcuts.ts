@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { adjacentSpeed } from "../debugger/ReplayController";
 import { runWorkflow, saveWorkflow } from "../state/actions";
+import { zoomCamera } from "../state/cameraStore";
 import { replay, seekToPosition } from "../state/replayStore";
 import { useRunStore } from "../state/runStore";
 import { useUiStore } from "../state/uiStore";
@@ -43,6 +44,10 @@ function perform(action: ShortcutAction): void {
       return replay.setSpeed(adjacentSpeed(speed, 1));
     case "slower":
       return replay.setSpeed(adjacentSpeed(speed, -1));
+    case "zoomIn":
+      return zoomCamera(1);
+    case "zoomOut":
+      return zoomCamera(-1);
     case "run":
       return void runWorkflow();
     case "save":

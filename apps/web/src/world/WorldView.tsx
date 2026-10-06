@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useCameraStore } from "../state/cameraStore";
 import { replay } from "../state/replayStore";
 import { useUiStore } from "../state/uiStore";
 import type { Insets } from "./Camera";
@@ -19,9 +20,14 @@ export function WorldView({ insets }: { insets: Insets }) {
       onDocumentClick: (documentId) => select({ kind: "document", documentId }),
       onTableClick: (tableId) => select({ kind: "table", tableId }),
       onFloorClick: () => select(null),
+      onCameraChange: (view) => useCameraStore.getState().report(view),
     });
     world.current = instance;
+    // The keys and the buttons that zoom reach the camera through here.
+    const controls = { zoomBy: (direction: 1 | -1) => instance.zoomBy(direction), fit: () => instance.fit() };
+    useCameraStore.getState().attach(controls);
     return () => {
+      useCameraStore.getState().detach(controls);
       instance.destroy();
       world.current = null;
     };

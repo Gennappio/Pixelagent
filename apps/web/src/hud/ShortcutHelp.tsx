@@ -1,12 +1,13 @@
 import { useUiStore } from "../state/uiStore";
 import { SHORTCUTS, type ShortcutGroup } from "./shortcuts";
 
-const GROUPS: ShortcutGroup[] = ["Panels", "Playback", "Workflow"];
+const GROUPS: ShortcutGroup[] = ["Panels", "Playback", "Camera", "Workflow"];
 
 const MOUSE = [
-  ["Click", "Inspect a character, a tool, a speech bubble"],
+  ["Click", "Inspect a character, a sheet, a tool, a speech bubble"],
   ["Click the floor", "Clear the selection"],
-  ["Wheel", "Zoom"],
+  ["Pinch, or Ctrl / ⌘ + wheel", "Zoom, around the pointer"],
+  ["Wheel, or two-finger scroll", "Pan"],
   ["Drag the floor", "Pan"],
   ["Double-click", "Frame the room again"],
 ];
@@ -40,7 +41,7 @@ export function ShortcutHelp() {
           </section>
         ))}
         <section>
-          <h3>Mouse</h3>
+          <h3>Mouse and trackpad</h3>
           <dl>
             {MOUSE.map(([gesture, effect]) => (
               <div key={gesture}>

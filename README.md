@@ -87,13 +87,23 @@ panels you leave open are remembered.
 | `O` | Office: workflow, agents, tools, runs | | `Space` | Play or pause |
 | `I` | Inspector (opens when you click something) | | `←` `→` | Previous / next event |
 | `L` | Log of the run on screen | | `Home` `End` | Start / end |
-| `T` | Timeline | | `−` `+` | Slower / faster |
-| `B` | Playback bar | | `Ctrl Enter` | Run the workflow |
-| `G` | Graph of the workflow | | `Ctrl S` | Save the workflow |
-| `H` | Hide or bring back every panel | | `?` | All shortcuts |
+| `T` | Timeline | | `,` `.` | Slower / faster |
+| `B` | Playback bar | | `−` `+` | Zoom out / in, one step |
+| `G` | Graph of the workflow | | `Ctrl Enter` | Run the workflow |
+| `H` | Hide or bring back every panel | | `Ctrl S` | Save the workflow |
+| `Esc` | Close the graph, or clear the selection | | `?` | All shortcuts |
 
-In the world: click to inspect, click the floor to deselect, wheel to zoom, drag the
-floor to pan, double-click to frame the room again.
+In the world: click to inspect, click the floor to deselect. Pinch, or hold Ctrl or ⌘
+and turn the wheel, to zoom around the pointer. The wheel alone, two fingers on a
+trackpad, or dragging the floor pans. Double-click frames the room again. The two
+buttons at the end of the playback bar zoom too, and the number between them frames the
+room again.
+
+The camera rests only at whole multiples of the pixel size, from 1× to 8×, plus one half
+for an overview: at any other scale pixel art shimmers. It starts at the largest step at
+which the room fits beside the open panels, and goes back to it when panels open or
+close, unless you have zoomed or panned. However far you pan, a corner of the room stays
+in sight.
 
 The switch in the top bar says what you are looking at. **BUILD**: no run on screen,
 the world previews the workflow, and this is the only mode that edits it. **RUN**: a
@@ -189,9 +199,10 @@ agents may work at the same time, default `4`).
 
 ## Status
 
-Phases 1–11 of AGENTS.md §38 are in place: event protocol, pixel world, event →
+Phases 1–12 of AGENTS.md §38 are in place: event protocol, pixel world, event →
 animation, replay, the world-first shell, documents, animation lanes, workflows as
-relations run by the office runtime, and the three slots with the spoken message.
+relations run by the office runtime, the three slots with the spoken message, and the
+camera that zooms in whole steps.
 
 AGENTS.md revision 2 (2026-10-05) set the direction: the pixel world is the primary
 GUI and becomes the editor, the graph a derived read-only view, and the workflow a list
@@ -199,9 +210,9 @@ of relations ("Anna sends_to Luca") over agents, tools, documents, tables and ro
 Revision 3 (2026-10-06), after the first hands-on use, fixes what a character is (one
 task with three slots: what arrives, what it consults, where its sheet goes), splits a
 hand-off into a spoken message and a sheet, and moves building onto the characters
-themselves, with a game's interface and a camera that zooms. The first of these, the
-model, is built (Phase 11). Next up is Phase 12 (the camera: zoom steps, pinch and
-Ctrl+wheel to zoom, wheel to pan), then building on the characters and the game
-interface; see AGENTS.md §38 for the plan. Workflows saved before relations existed, and
+themselves, with a game's interface and a camera that zooms. The model (Phase 11) and
+the camera (Phase 12) are built. Next up is Phase 13 (building on the characters: a menu
+on each character, targets picked in the world), then the game interface; see AGENTS.md
+§38 for the plan. Workflows saved before relations existed, and
 runs exported before hand-offs had words, still open: they are read as they are, and a
 file is rewritten only when saved.

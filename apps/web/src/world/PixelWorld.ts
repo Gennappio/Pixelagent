@@ -1,6 +1,6 @@
 import { Application, Container, Graphics } from "pixi.js";
 import { AgentSprite } from "./AgentSprite";
-import { NO_INSETS, WorldCamera, type Insets } from "./Camera";
+import { NO_INSETS, WorldCamera, type CameraView, type Insets } from "./Camera";
 import { DocumentSprite } from "./DocumentSprite";
 import { TableSprite, Tray } from "./Furniture";
 import { ROOM, type WorldLayout } from "./layout";
@@ -28,6 +28,8 @@ export interface WorldCallbacks {
   onTableClick: (tableId: string) => void;
   /** A click on empty floor. */
   onFloorClick: () => void;
+  /** The camera rests at another zoom step, or has started or stopped framing the room by itself. */
+  onCameraChange?: (view: CameraView) => void;
 }
 
 /** What the user has picked. Interface state: it never comes from, or reaches, the event log. */
@@ -107,7 +109,7 @@ export class PixelWorld {
     this.host.appendChild(this.app.canvas);
     this.scene.addChild(drawRoom(), this.stationLayer, this.agentLayer, this.documentLayer, this.bubbleLayer);
     this.app.stage.addChild(this.scene);
-    this.camera = new WorldCamera(this.app, this.scene, ROOM, this.callbacks.onFloorClick);
+    this.camera = new WorldCamera(this.app, this.scene, ROOM, this.callbacks.onFloorClick, this.callbacks.onCameraChange);
     this.camera.setInsets(this.insets);
     // The renderer only follows window resizes by itself; the host also changes size
     // when the timeline drawer or the playback bar opens and closes.
@@ -125,6 +127,16 @@ export class PixelWorld {
 
   setSelection(selection: WorldSelection): void {
     this.selection = selection;
+  }
+
+  /** One zoom step in (1) or out (-1), around the middle of the space the HUD leaves free. */
+  zoomBy(direction: 1 | -1): void {
+    this.camera?.zoomBy(direction);
+  }
+
+  /** Frames the room again. */
+  fit(): void {
+    this.camera?.fit();
   }
 
   destroy(): void {

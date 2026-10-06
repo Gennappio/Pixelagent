@@ -1,3 +1,4 @@
+import { ZoomControl } from "../hud/ZoomControl";
 import { replay, seekToPosition, useReplay } from "../state/replayStore";
 import { useRunStore } from "../state/runStore";
 import { useUiStore } from "../state/uiStore";
@@ -14,12 +15,15 @@ export function PlaybackBar() {
 
   if (!expanded) {
     return (
-      <button className="playback-strip" title="Show the playback bar (B)" onClick={() => toggle("playback")}>
-        <span className="fill" style={{ width: `${empty ? 0 : (position / total) * 100}%` }} />
-        <span className="label">
-          {position} / {total}
-        </span>
-      </button>
+      <div className="playback-strip">
+        <button className="strip-progress" title="Show the playback bar (B)" onClick={() => toggle("playback")}>
+          <span className="fill" style={{ width: `${empty ? 0 : (position / total) * 100}%` }} />
+          <span className="label">
+            {position} / {total}
+          </span>
+        </button>
+        <ZoomControl />
+      </div>
     );
   }
 
@@ -43,7 +47,7 @@ export function PlaybackBar() {
         ▶|
       </button>
       <select
-        title="Replay speed (− / +)"
+        title="Replay speed (, / .)"
         value={speed}
         onChange={(event) => {
           replay.setSpeed(Number(event.target.value));
@@ -71,6 +75,7 @@ export function PlaybackBar() {
       <span className={`badge ${mode === "build" ? "" : streaming ? "live" : "replay"}`}>
         {mode === "build" ? "NO RUN" : streaming ? (position < total ? "LIVE · buffering" : "LIVE") : "REPLAY"}
       </span>
+      <ZoomControl />
       <button className={timeline ? "active" : ""} aria-pressed={timeline} title="Timeline (T)" onClick={() => toggle("timeline")}>
         Timeline <kbd>T</kbd>
       </button>

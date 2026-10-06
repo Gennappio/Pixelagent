@@ -15,10 +15,12 @@ export type ShortcutAction =
   | { type: "toEnd" }
   | { type: "faster" }
   | { type: "slower" }
+  | { type: "zoomIn" }
+  | { type: "zoomOut" }
   | { type: "run" }
   | { type: "save" };
 
-export type ShortcutGroup = "Panels" | "Playback" | "Workflow";
+export type ShortcutGroup = "Panels" | "Playback" | "Camera" | "Workflow";
 
 export interface Shortcut {
   group: ShortcutGroup;
@@ -51,8 +53,12 @@ export const SHORTCUTS: Shortcut[] = [
   { group: "Playback", keys: ["ArrowLeft"], repeat: true, label: "←", description: "Previous event", action: { type: "previous" } },
   { group: "Playback", keys: ["Home"], label: "Home", description: "Back to the start", action: { type: "toStart" } },
   { group: "Playback", keys: ["End"], label: "End", description: "Jump to the end", action: { type: "toEnd" } },
-  { group: "Playback", keys: ["+", "="], label: "+", description: "Faster", action: { type: "faster" } },
-  { group: "Playback", keys: ["-"], label: "−", description: "Slower", action: { type: "slower" } },
+  { group: "Playback", keys: ["."], label: ".", description: "Faster", action: { type: "faster" } },
+  { group: "Playback", keys: [","], label: ",", description: "Slower", action: { type: "slower" } },
+
+  // "=" is the unshifted + of a US keyboard. With Ctrl or ⌘ these are the browser's own zoom, and are left to it.
+  { group: "Camera", keys: ["+", "="], repeat: true, label: "+", description: "Zoom in one step", action: { type: "zoomIn" } },
+  { group: "Camera", keys: ["-"], repeat: true, label: "−", description: "Zoom out one step", action: { type: "zoomOut" } },
 
   { group: "Workflow", keys: ["Enter"], mod: true, label: "Ctrl Enter", description: "Run the workflow", action: { type: "run" } },
   { group: "Workflow", keys: ["s"], mod: true, label: "Ctrl S", description: "Save the workflow", action: { type: "save" } },
